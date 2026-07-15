@@ -192,6 +192,72 @@
   #rStop.holding .hold-bar { width: 100%; transition: width 2.5s linear; }
   #rStop span { position: relative; z-index: 1; }
 
+  /* ---- 설문 화면 ---- */
+  #surveyView {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    background: var(--bg);
+    display: none;
+    flex-direction: column;
+  }
+  #surveyView.show { display: flex; }
+  .sv-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 10px;
+    background: var(--panel);
+  }
+  .sv-head button { padding: 10px 14px; font-size: 14px; background: #262a3a; }
+  #svTitle { flex: 1; text-align: center; font-size: 15px; font-weight: 700; }
+  #svDone { background: var(--accent); color: #0e1020; display: none; }
+  #surveyView.frame-mode #svDone { display: block; }
+  #svList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #surveyView.frame-mode #svList { display: none; }
+  #svFrame {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: #fff;
+    display: none;
+  }
+  #surveyView.frame-mode #svFrame { display: block; }
+  .sv-phase {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 10px 2px 0;
+    letter-spacing: 0.5px;
+  }
+  .sv-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    font-size: 15px;
+    padding: 14px;
+  }
+  .sv-row.done { opacity: 0.55; }
+  .sv-row.next { border: 1.5px solid var(--glow); }
+  .sv-row .sv-status { font-size: 16px; }
+  .sv-row span:nth-child(2) { flex: 1; }
+  .sv-next {
+    font-size: 11px;
+    font-weight: 700;
+    color: #0e1020;
+    background: var(--glow);
+    border-radius: 999px;
+    padding: 3px 8px;
+  }
+
   /* ---- 멀미 점수 패널 ---- */
   #scorePanel {
     position: fixed;
@@ -310,6 +376,7 @@
       <button type="button" id="subjectRefresh" style="padding:12px 14px;font-size:16px">↻</button>
     </div>
   </div>
+  <button type="button" id="surveyBtn">📋 설문 (0/6 완료)</button>
   <div class="field">
     <label>시나리오 — 시트의 이 행에 기록돼요</label>
     <select id="scenario">
@@ -362,10 +429,22 @@
   <div id="pdfLoading">책을 여는 중…</div>
 </div>
 <div id="readCtrl">
+  <button id="rSurvey">📋</button>
   <button id="rZoomOut">－</button>
   <button id="rZoomIn">＋</button>
   <button id="rStart">▶ 시작</button>
   <button id="rStop" hidden><span>꾹 눌러 종료</span><div class="hold-bar"></div></button>
+</div>
+
+<!-- 설문 화면 -->
+<div id="surveyView">
+  <div class="sv-head">
+    <button id="svBack">‹ 뒤로</button>
+    <div id="svTitle">설문</div>
+    <button id="svDone">완료로 표시 ✓</button>
+  </div>
+  <div id="svList"></div>
+  <iframe id="svFrame" title="설문"></iframe>
 </div>
 
 <!-- 멀미 점수 입력 패널 -->
@@ -494,6 +573,12 @@
     if (!readConfig()) return;
     if (($('sheetUrl').value || '').trim() && !$('subject').value &&
         !confirm('피험자가 선택되지 않았어요. 그래도 시작할까요?\n(기록은 시트 맨 아래 "미분류"로 저장돼요)')) return;
+    const sd = getSurveyDone();
+    const preTodo = SURVEYS.filter(s => s.phase === '실험 전' && !sd[s.id]).length;
+    if (preTodo > 0 && confirm('실험 전 설문 ' + preTodo + '개가 아직 미완료예요.\n설문 화면을 먼저 열까요?\n(취소를 누르면 그냥 시작해요)')) {
+      openSurveyList();
+      return;
+    }
     if (bookData) {
       // 책 모드: 책만 먼저 열고, 타이머는 책 화면의 ▶ 시작 버튼으로
       reading = true;
@@ -929,6 +1014,109 @@
       st.textContent = '❌ 실패 — URL이 맞는지, 배포 설정이 "모든 사용자"인지 확인해주세요. (' + (e.message || e) + ')';
     }
   });
+
+  // ================= 설문 =================
+  const SURVEYS = [
+    { id: 'cond',      phase: '실험 전', name: '① 컨디션 평가',        url: 'https://ko.surveymonkey.com/r/7377DYS' },
+    { id: 'msaq_pre',  phase: '실험 전', name: '② MSAQ (주행 전)',     url: 'https://ko.surveymonkey.com/r/7372FSP' },
+    { id: 'mssq',      phase: '실험 전', name: '③ MSSQ 멀미 민감도',   url: 'https://ko.surveymonkey.com/r/X7L39Z6' },
+    { id: 'msaq_mid',  phase: '실험 중', name: '④ MSAQ (주행 중)',     url: 'https://ko.surveymonkey.com/r/X7VHRTN' },
+    { id: 'msaq_post', phase: '실험 후', name: '⑤ MSAQ (주행 후)',     url: 'https://ko.surveymonkey.com/r/X7KCVTK' },
+    { id: 'fss',       phase: '실험 후', name: '⑥ FSS NDRT 몰입도',    url: 'https://ko.surveymonkey.com/r/X7V9XNL' }
+  ];
+  let curSurvey = null;
+
+  function surveyKey() { return 'surveys:' + ($('subject').value || '공통'); }
+  function getSurveyDone() {
+    try { return JSON.parse(localStorage.getItem(surveyKey()) || '{}'); } catch (e) { return {}; }
+  }
+  function setSurveyDone(id, v) {
+    const d = getSurveyDone();
+    if (v) d[id] = true; else delete d[id];
+    localStorage.setItem(surveyKey(), JSON.stringify(d));
+  }
+  function updateSurveyBtn() {
+    const d = getSurveyDone();
+    const n = SURVEYS.filter(s => d[s.id]).length;
+    $('surveyBtn').textContent = '📋 설문 (' + n + '/' + SURVEYS.length + ' 완료)';
+  }
+  function renderSurveyList() {
+    const done = getSurveyDone();
+    const wrap = $('svList');
+    wrap.innerHTML = '';
+    const firstTodo = SURVEYS.find(s => !done[s.id]);
+    let lastPhase = '';
+    for (const s of SURVEYS) {
+      if (s.phase !== lastPhase) {
+        const h = document.createElement('div');
+        h.className = 'sv-phase';
+        h.textContent = '─ ' + s.phase + ' ─';
+        wrap.appendChild(h);
+        lastPhase = s.phase;
+      }
+      const isNext = firstTodo && firstTodo.id === s.id;
+      const row = document.createElement('button');
+      row.className = 'sv-row' + (done[s.id] ? ' done' : '') + (isNext ? ' next' : '');
+      const st = document.createElement('span');
+      st.className = 'sv-status';
+      st.textContent = done[s.id] ? '✅' : '○';
+      const nm = document.createElement('span');
+      nm.textContent = s.name;
+      row.appendChild(st);
+      row.appendChild(nm);
+      if (isNext) {
+        const tag = document.createElement('span');
+        tag.className = 'sv-next';
+        tag.textContent = '다음 차례';
+        row.appendChild(tag);
+      }
+      row.addEventListener('click', () => openSurvey(s));
+      wrap.appendChild(row);
+    }
+    const reset = document.createElement('button');
+    reset.className = 'ghost';
+    reset.textContent = '이 피험자의 설문 완료 기록 초기화';
+    reset.addEventListener('click', () => {
+      if (confirm('설문 완료 기록을 모두 초기화할까요?')) {
+        localStorage.removeItem(surveyKey());
+        renderSurveyList();
+        updateSurveyBtn();
+      }
+    });
+    wrap.appendChild(reset);
+    updateSurveyBtn();
+  }
+  function openSurveyList() {
+    renderSurveyList();
+    $('surveyView').classList.remove('frame-mode');
+    $('surveyView').classList.add('show');
+  }
+  function openSurvey(s) {
+    curSurvey = s;
+    $('svTitle').textContent = s.name;
+    $('svDone').textContent = getSurveyDone()[s.id] ? '완료 취소' : '완료로 표시 ✓';
+    $('svFrame').src = s.url;
+    $('surveyView').classList.add('frame-mode');
+  }
+  function closeSurveyFrame() {
+    $('svFrame').src = 'about:blank';
+    $('surveyView').classList.remove('frame-mode');
+    curSurvey = null;
+    renderSurveyList();
+  }
+  $('svDone').addEventListener('click', () => {
+    if (!curSurvey) return;
+    setSurveyDone(curSurvey.id, !getSurveyDone()[curSurvey.id]);
+    closeSurveyFrame();
+  });
+  $('svBack').addEventListener('click', () => {
+    if (curSurvey) closeSurveyFrame();
+    else $('surveyView').classList.remove('show');
+  });
+  $('surveyBtn').addEventListener('click', openSurveyList);
+  $('rSurvey').addEventListener('click', openSurveyList);
+  $('subject').addEventListener('change', updateSurveyBtn);
+  updateSurveyBtn();
 
   // ---- 책 화면 버튼 ----
   $('rZoomIn').addEventListener('click', () => setZoom(zoom * 1.2));
