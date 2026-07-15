@@ -17,7 +17,7 @@
     --text: #e8eaf2;
     --dim: #8a8fa3;
     --accent: #7c9cff;
-    --glow: #ffd9a0;
+    --glow: #35e88c;
     --done: #9ff0c0;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -129,41 +129,42 @@
     font-size: 15px;
   }
 
-  #pill {
+  #readCtrl {
     position: fixed;
     top: max(10px, env(safe-area-inset-top));
     right: 12px;
     z-index: 20;
+    display: none;
+    gap: 8px;
+  }
+  #readCtrl.show { display: flex; }
+  #readCtrl button {
     background: rgba(18, 20, 30, 0.82);
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 999px;
     color: var(--text);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    padding: 9px 14px;
-    display: none;
+    padding: 10px 16px;
+    -webkit-touch-callout: none;
   }
-  #readView.active ~ #pill { display: block; }
-
-  #pillMenu {
-    position: fixed;
-    top: calc(max(10px, env(safe-area-inset-top)) + 46px);
-    right: 12px;
-    z-index: 21;
-    background: var(--panel);
-    border-radius: 16px;
-    padding: 8px;
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-    width: 190px;
-    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+  #rStart { color: #0e1020; background: var(--glow); border: none; }
+  #rStop {
+    position: relative;
+    overflow: hidden;
+    color: #ffb4b4;
   }
-  #pillMenu.open { display: flex; }
-  #pillMenu button { padding: 11px; font-size: 14px; background: #262a3a; }
+  #rStop .hold-bar {
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    background: rgba(255, 90, 90, 0.45);
+    border-radius: 999px;
+  }
+  #rStop.holding .hold-bar { width: 100%; transition: width 2.5s linear; }
+  #rStop span { position: relative; z-index: 1; }
 
   /* ---- 반짝임 오버레이 ---- */
   #flash {
@@ -184,12 +185,12 @@
   #flash .glow-edge {
     position: absolute;
     inset: 0;
-    box-shadow: inset 0 0 60px 12px var(--glow-color, var(--glow));
+    box-shadow: inset 0 0 110px 26px var(--glow-color, var(--glow));
   }
   #flash.on .glow-edge { animation: pulse 1.4s ease-in-out infinite; animation-delay: 0.2s; }
   @keyframes pulse {
-    0%, 100% { opacity: 0.15; }
-    50% { opacity: 0.55; }
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.95; }
   }
   #flash .flash-msg {
     position: absolute;
@@ -273,12 +274,11 @@
   <div id="pdfScroll"></div>
   <div id="pdfLoading">책을 여는 중…</div>
 </div>
-<button id="pill">✨ --:--</button>
-<div id="pillMenu">
-  <button id="mPause">일시정지</button>
-  <button id="mZoomIn">확대 ＋</button>
-  <button id="mZoomOut">축소 －</button>
-  <button id="mStop" class="danger">측정 종료</button>
+<div id="readCtrl">
+  <button id="rZoomOut">－</button>
+  <button id="rZoomIn">＋</button>
+  <button id="rStart">▶ 시작</button>
+  <button id="rStop" hidden><span>꾹 눌러 종료</span><div class="hold-bar"></div></button>
 </div>
 
 <!-- 반짝임 오버레이 -->
@@ -355,9 +355,8 @@
     if (elapsed >= totalMs) { finish(); return; }
 
     const nextAt = Math.min(nextAlertIdx * intervalMs, totalMs);
-    if (reading) {
-      $('pill').textContent = '✨ ' + fmt(nextAt - elapsed) + ' · ' + fmt(elapsed) + '/' + fmt(totalMs);
-    } else {
+    // 책 모드에서는 예측을 막기 위해 남은 시간을 표시하지 않음
+    if (!reading) {
       $('nextIn').textContent = fmt(nextAt - elapsed);
       $('alertCount').textContent = nextAlertIdx * intervalMs >= totalMs
         ? '마지막 · 종료 대기'
@@ -367,33 +366,40 @@
     }
   }
 
-  function start() {
+  function readConfig() {
     const total = parseFloat($('totalMin').value);
     const interval = parseFloat($('intervalMin').value);
     const fsec = parseFloat($('flashSec').value);
-    if (!(total > 0) || !(interval > 0)) { alert('시간과 간격을 확인해주세요.'); return; }
-
+    if (!(total > 0) || !(interval > 0)) { alert('시간과 간격을 확인해주세요.'); return false; }
     totalMs = total * 60000;
     intervalMs = interval * 60000;
     flashMs = (fsec > 0 ? fsec : 6) * 1000;
+    return true;
+  }
+
+  function beginTimer() {
     startTime = Date.now();
     pausedAt = 0;
     nextAlertIdx = 1;
+    acquireWakeLock();
+    clearInterval(tickTimer);
+    tickTimer = setInterval(tick, 250);
+    tick();
+  }
 
+  function start() {
+    if (!readConfig()) return;
     if (bookData) {
+      // 책 모드: 책만 먼저 열고, 타이머는 책 화면의 ▶ 시작 버튼으로
       reading = true;
       show(null);
       enterReading();
     } else {
       reading = false;
       show('run');
+      $('pauseBtn').textContent = '일시정지';
+      beginTimer();
     }
-    $('pauseBtn').textContent = '일시정지';
-    $('mPause').textContent = '일시정지';
-    acquireWakeLock();
-    clearInterval(tickTimer);
-    tickTimer = setInterval(tick, 250);
-    tick();
   }
 
   function pauseResume() {
@@ -403,7 +409,6 @@
       pausedAt = 0;
       tickTimer = setInterval(tick, 250);
       $('pauseBtn').textContent = '일시정지';
-      $('mPause').textContent = '일시정지';
       acquireWakeLock();
     } else {
       clearInterval(tickTimer);
@@ -411,19 +416,19 @@
       pausedAt = Date.now();
       stopFlash();
       $('pauseBtn').textContent = '재개';
-      $('mPause').textContent = '▶ 재개';
-      if (reading) $('pill').textContent = '⏸ 일시정지됨';
-      else $('nextIn').textContent = '⏸';
+      $('nextIn').textContent = '⏸';
     }
   }
 
   function finish() {
     const alertsFired = nextAlertIdx - 1;
     stopTimer();
-    flash('측정 완료', cssVar('--done'), 10000);
     if (reading) {
-      $('pill').textContent = '✅ 완료 · 알림 ' + alertsFired + '회';
+      // 알림(초록)과 구분되는 파란빛으로 종료를 알림
+      flash('측정 완료', cssVar('--accent'), 12000);
+      $('rStop').querySelector('span').textContent = '완료 · 꾹 눌러 종료';
     } else {
+      flash('측정 완료', cssVar('--done'), 10000);
       $('doneSummary').textContent = fmt(totalMs) + ' 동안 알림 ' + alertsFired + '회';
       show('done');
     }
@@ -439,8 +444,12 @@
   function exitReading() {
     reading = false;
     $('readView').classList.remove('active');
-    $('pill').style.display = 'none';
-    $('pillMenu').classList.remove('open');
+    $('readCtrl').classList.remove('show');
+    $('rStart').hidden = false;
+    $('rZoomIn').hidden = false;
+    $('rZoomOut').hidden = false;
+    $('rStop').hidden = true;
+    $('rStop').querySelector('span').textContent = '꾹 눌러 종료';
     $('pdfScroll').innerHTML = '';
     if (pdfDoc) { pdfDoc.destroy().catch(() => {}); pdfDoc = null; }
     show('setup');
@@ -490,6 +499,7 @@
 
   function setBook(book, save) {
     bookData = book;
+    $('startBtn').textContent = book ? '📖 책 열기' : '시작';
     const st = $('pdfStatus');
     if (book) {
       st.innerHTML = '선택된 책: <b></b><span class="rm">제거</span>';
@@ -537,7 +547,7 @@
   // -- PDF 렌더링 (보이는 페이지만 그려서 메모리 절약) --
   async function enterReading() {
     $('readView').classList.add('active');
-    $('pill').style.display = 'block';
+    $('readCtrl').classList.add('show');
     $('pdfLoading').style.display = 'block';
     try {
       const pdfjs = await loadPdfjs();
@@ -639,18 +649,43 @@
     resizeT = setTimeout(buildPages, 300);
   });
 
-  // ---- 알약(pill) 메뉴 ----
-  $('pill').addEventListener('click', () => $('pillMenu').classList.toggle('open'));
-  $('mPause').addEventListener('click', () => { pauseResume(); $('pillMenu').classList.remove('open'); });
-  $('mZoomIn').addEventListener('click', () => setZoom(zoom * 1.2));
-  $('mZoomOut').addEventListener('click', () => setZoom(zoom / 1.2));
-  $('mStop').addEventListener('click', () => {
-    if (confirm('측정을 종료할까요?')) {
+  // ---- 책 화면 버튼 ----
+  $('rZoomIn').addEventListener('click', () => setZoom(zoom * 1.2));
+  $('rZoomOut').addEventListener('click', () => setZoom(zoom / 1.2));
+
+  $('rStart').addEventListener('click', () => {
+    if (!readConfig()) return;
+    $('rStart').hidden = true;
+    $('rZoomIn').hidden = true;
+    $('rZoomOut').hidden = true;
+    $('rStop').hidden = false;
+    beginTimer();
+  });
+
+  // 종료는 2.5초 동안 꾹 눌러야 동작 (실수 방지)
+  const HOLD_MS = 2500;
+  let holdTimer = null;
+  const rStop = $('rStop');
+  function holdCancel() {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    rStop.classList.remove('holding');
+  }
+  rStop.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    rStop.setPointerCapture(e.pointerId);
+    rStop.classList.add('holding');
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      holdCancel();
       stopTimer();
       stopFlash();
       exitReading();
-    }
+    }, HOLD_MS);
   });
+  rStop.addEventListener('pointerup', holdCancel);
+  rStop.addEventListener('pointercancel', holdCancel);
+  rStop.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // ---- 버튼 ----
   $('startBtn').addEventListener('click', start);
