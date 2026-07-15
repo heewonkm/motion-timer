@@ -59,6 +59,17 @@
   }
   input[type="number"]:focus { border-color: var(--accent); }
   .unit { color: var(--dim); font-size: 15px; width: 28px; }
+  input[type="url"] {
+    background: var(--panel);
+    border: 1px solid #2c3040;
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 13px;
+    padding: 12px;
+    outline: none;
+    width: 100%;
+  }
+  input[type="url"]:focus { border-color: var(--accent); }
 
   button {
     border: none;
@@ -166,6 +177,36 @@
   #rStop.holding .hold-bar { width: 100%; transition: width 2.5s linear; }
   #rStop span { position: relative; z-index: 1; }
 
+  /* ---- 멀미 점수 패널 ---- */
+  #scorePanel {
+    position: fixed;
+    top: calc(max(10px, env(safe-area-inset-top)) + 56px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    background: rgba(14, 16, 25, 0.9);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    padding: 12px;
+    display: none;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    width: min(92vw, 430px);
+    box-shadow: 0 12px 44px rgba(0, 0, 0, 0.5);
+  }
+  #scorePanel.show { display: grid; }
+  #scorePanel button {
+    padding: 15px 0;
+    font-size: 20px;
+    font-weight: 800;
+    background: #262a3a;
+    border-radius: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  #scorePanel button:active { background: var(--glow); color: #0e1020; }
+
   /* ---- 반짝임 오버레이 ---- */
   #flash {
     position: fixed;
@@ -244,6 +285,12 @@
     <input type="file" id="pdfInput" accept="application/pdf,.pdf" style="display:none">
     <div id="pdfStatus"></div>
   </div>
+  <div class="field">
+    <label>구글 시트 자동 기록 (선택 — Apps Script 웹 앱 URL)</label>
+    <input type="url" id="sheetUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+    <button class="ghost" id="testSheetBtn" type="button">🔗 연결 테스트</button>
+    <div class="hint" id="sheetStatus" style="text-align:left"></div>
+  </div>
   <button class="primary" id="startBtn">시작</button>
   <button class="ghost" id="previewBtn">✨ 반짝임 미리보기</button>
   <p class="hint">측정 중에는 화면이 꺼지지 않도록 유지돼요.</p>
@@ -280,6 +327,9 @@
   <button id="rStart">▶ 시작</button>
   <button id="rStop" hidden><span>꾹 눌러 종료</span><div class="hold-bar"></div></button>
 </div>
+
+<!-- 멀미 점수 입력 패널 -->
+<div id="scorePanel"></div>
 
 <!-- 반짝임 오버레이 -->
 <div id="flash">
@@ -349,6 +399,7 @@
 
     while (nextAlertIdx * intervalMs <= elapsed && nextAlertIdx * intervalMs < totalMs) {
       flash('', cssVar('--glow'), flashMs);   // 텍스트 없이 불빛만
+      showScorePanel(nextAlertIdx, fmt(nextAlertIdx * intervalMs));
       nextAlertIdx++;
     }
 
@@ -378,6 +429,9 @@
   }
 
   function beginTimer() {
+    const d = new Date();
+    sessionId = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
     startTime = Date.now();
     pausedAt = 0;
     nextAlertIdx = 1;
@@ -443,6 +497,7 @@
 
   function exitReading() {
     reading = false;
+    hideScorePanel();
     $('readView').classList.remove('active');
     $('readCtrl').classList.remove('show');
     $('rStart').hidden = false;
@@ -649,6 +704,94 @@
     resizeT = setTimeout(buildPages, 300);
   });
 
+  // ================= 멀미 점수 → 구글 시트 =================
+  const QUEUE_KEY = 'scoreQueue';
+  let sessionId = '';
+  let curAlert = 0;
+  let curElapsed = '';
+  let sending = false;
+  let queue = [];
+  try { queue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { queue = []; }
+
+  $('sheetUrl').value = localStorage.getItem('sheetUrl') || '';
+  $('sheetUrl').addEventListener('input', () => localStorage.setItem('sheetUrl', $('sheetUrl').value.trim()));
+
+  // 1~10 버튼 생성
+  for (let i = 1; i <= 10; i++) {
+    const b = document.createElement('button');
+    b.textContent = i;
+    b.addEventListener('click', () => recordScore(i));
+    $('scorePanel').appendChild(b);
+  }
+
+  function showScorePanel(alertIdx, elapsedStr) {
+    curAlert = alertIdx;
+    curElapsed = elapsedStr;
+    $('scorePanel').classList.add('show');
+  }
+  function hideScorePanel() {
+    $('scorePanel').classList.remove('show');
+  }
+
+  function recordScore(score) {
+    hideScorePanel();
+    queue.push({ ts: new Date().toISOString(), session: sessionId, alert: curAlert, elapsed: curElapsed, score });
+    saveQueue();
+    trySend();
+  }
+  function saveQueue() {
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(queue)); } catch (e) {}
+    updateSheetStatus();
+  }
+  function updateSheetStatus() {
+    const st = $('sheetStatus');
+    if (queue.length > 0) {
+      st.textContent = '⏳ 시트 전송 대기 ' + queue.length + '건 (연결되면 자동 전송돼요)';
+    } else if (st.textContent.indexOf('⏳') === 0) {
+      st.textContent = '✅ 대기하던 기록을 모두 전송했어요';
+    }
+  }
+  async function trySend() {
+    const url = ($('sheetUrl').value || '').trim();
+    if (sending || !url || queue.length === 0) return;
+    sending = true;
+    while (queue.length > 0) {
+      try {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // preflight 없는 요청이어야 Apps Script와 통신 가능
+          body: JSON.stringify(queue[0])
+        });
+        if (!r.ok) throw new Error(r.status);
+        queue.shift();
+        saveQueue();
+      } catch (e) { break; }
+    }
+    sending = false;
+    updateSheetStatus();
+  }
+  setInterval(trySend, 30000);
+  trySend();
+  updateSheetStatus();
+
+  $('testSheetBtn').addEventListener('click', async () => {
+    const url = ($('sheetUrl').value || '').trim();
+    const st = $('sheetStatus');
+    if (!url) { st.textContent = '먼저 URL을 붙여넣어주세요.'; return; }
+    st.textContent = '테스트 중…';
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ ts: new Date().toISOString(), session: 'TEST', alert: 0, elapsed: '0:00', score: '연결 테스트' })
+      });
+      if (!r.ok) throw new Error('응답 코드 ' + r.status);
+      st.textContent = '✅ 성공! 시트에 테스트 행이 추가됐는지 확인해보세요.';
+    } catch (e) {
+      st.textContent = '❌ 실패 — URL이 맞는지, 배포 설정이 "모든 사용자"인지 확인해주세요.';
+    }
+  });
+
   // ---- 책 화면 버튼 ----
   $('rZoomIn').addEventListener('click', () => setZoom(zoom * 1.2));
   $('rZoomOut').addEventListener('click', () => setZoom(zoom / 1.2));
@@ -693,9 +836,9 @@
     flash('', cssVar('--glow'), (parseFloat($('flashSec').value) || 6) * 1000));
   $('pauseBtn').addEventListener('click', pauseResume);
   $('stopBtn').addEventListener('click', () => {
-    if (confirm('측정을 종료할까요?')) { stopTimer(); stopFlash(); show('setup'); }
+    if (confirm('측정을 종료할까요?')) { stopTimer(); stopFlash(); hideScorePanel(); show('setup'); }
   });
-  $('againBtn').addEventListener('click', () => { stopFlash(); show('setup'); });
+  $('againBtn').addEventListener('click', () => { stopFlash(); hideScorePanel(); show('setup'); });
 })();
 
 // 오프라인 사용을 위한 캐싱 (https로 접속했을 때만 동작)
