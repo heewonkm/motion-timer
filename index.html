@@ -788,29 +788,41 @@
   function updateSheetStatus() {
     const st = $('sheetStatus');
     if (queue.length > 0) {
-      st.textContent = '⏳ 시트 전송 대기 ' + queue.length + '건 (연결되면 자동 전송돼요)';
+      st.innerHTML = '⏳ 시트 전송 대기 ' + queue.length + '건 (자동 재시도 중) <span class="rm" id="clearQueue">지우기</span>';
     } else if (st.textContent.indexOf('⏳') === 0) {
       st.textContent = '✅ 대기하던 기록을 모두 전송했어요';
     }
+  }
+  $('sheetStatus').addEventListener('click', (e) => {
+    if (e.target.id === 'clearQueue' && confirm('전송 대기 중인 기록 ' + queue.length + '건을 지울까요?')) {
+      queue = [];
+      saveQueue();
+      $('sheetStatus').textContent = '대기 기록을 지웠어요.';
+    }
+  });
+  async function sendOne(item, url) {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // preflight 없는 요청이어야 Apps Script와 통신 가능
+      body: JSON.stringify(item)
+    });
+    if (!r.ok) throw new Error(r.status);
+    const body = await r.text();
+    if (body.trim() !== 'ok') throw new Error(body);
   }
   async function trySend() {
     const url = ($('sheetUrl').value || '').trim();
     if (sending || !url || queue.length === 0) return;
     sending = true;
-    while (queue.length > 0) {
-      try {
-        const r = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },  // preflight 없는 요청이어야 Apps Script와 통신 가능
-          body: JSON.stringify(queue[0])
-        });
-        if (!r.ok) throw new Error(r.status);
-        const body = await r.text();
-        if (body.trim() !== 'ok') throw new Error(body);
-        queue.shift();
-        saveQueue();
-      } catch (e) { break; }
+    // 항목별 독립 전송 — 하나가 실패해도 나머지는 계속 시도
+    const items = queue.splice(0);
+    const failed = [];
+    for (const item of items) {
+      try { await sendOne(item, url); }
+      catch (e) { failed.push(item); }
     }
+    queue.unshift(...failed);
+    saveQueue();
     sending = false;
     updateSheetStatus();
   }
