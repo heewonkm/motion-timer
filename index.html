@@ -348,7 +348,7 @@
     const elapsed = Date.now() - startTime;
 
     while (nextAlertIdx * intervalMs <= elapsed && nextAlertIdx * intervalMs < totalMs) {
-      flash(nextAlertIdx + '번째 · 기록하세요', cssVar('--glow'), flashMs);
+      flash('', cssVar('--glow'), flashMs);   // 텍스트 없이 불빛만
       nextAlertIdx++;
     }
 
@@ -690,7 +690,7 @@
   // ---- 버튼 ----
   $('startBtn').addEventListener('click', start);
   $('previewBtn').addEventListener('click', () =>
-    flash('이렇게 반짝여요', cssVar('--glow'), (parseFloat($('flashSec').value) || 6) * 1000));
+    flash('', cssVar('--glow'), (parseFloat($('flashSec').value) || 6) * 1000));
   $('pauseBtn').addEventListener('click', pauseResume);
   $('stopBtn').addEventListener('click', () => {
     if (confirm('측정을 종료할까요?')) { stopTimer(); stopFlash(); show('setup'); }
