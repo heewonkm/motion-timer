@@ -465,6 +465,15 @@
     return true;
   }
 
+  // 시트 열은 1분 단위(1~30)라 1분 미만 간격은 격자에 못 들어감을 경고
+  function confirmIntervalOk() {
+    const urlSet = ($('sheetUrl').value || '').trim();
+    if (urlSet && intervalMs < 60000) {
+      return confirm('알림 간격이 1분 미만이에요.\n시트는 1분 단위라서 이 기록들은 격자가 아닌 "미분류"로 저장돼요.\n(빠른 테스트용이라면 그대로 진행하세요)\n\n시작할까요?');
+    }
+    return true;
+  }
+
   function beginTimer() {
     const d = new Date();
     sessionId = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
@@ -488,6 +497,7 @@
       show(null);
       enterReading();
     } else {
+      if (!confirmIntervalOk()) return;
       reading = false;
       show('run');
       $('pauseBtn').textContent = '일시정지';
@@ -906,6 +916,7 @@
 
   $('rStart').addEventListener('click', () => {
     if (!readConfig()) return;
+    if (!confirmIntervalOk()) return;
     $('rStart').hidden = true;
     $('rZoomIn').hidden = true;
     $('rZoomOut').hidden = true;
