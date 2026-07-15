@@ -221,6 +221,9 @@
     font-variant-numeric: tabular-nums;
   }
   #scorePanel button:active { background: var(--glow); color: #0e1020; }
+  #scorePanel button.sel { background: var(--glow); color: #0e1020; }
+  #scorePanel #scoreOk { background: var(--accent); color: #0e1020; font-size: 16px; }
+  #scorePanel #scoreOk:disabled { opacity: 0.3; }
 
   /* ---- 반짝임 오버레이 ---- */
   #flash {
@@ -807,19 +810,36 @@
   $('sheetUrl').addEventListener('change', loadSubjects);
   loadSubjects();
 
-  // 0~10 버튼 생성
+  // 0~10 버튼 + OK 생성 (숫자는 선택만, OK를 눌러야 전송 — 실수 방지)
+  let selectedScore = null;
   for (let i = 0; i <= 10; i++) {
     const b = document.createElement('button');
     b.textContent = i;
-    b.addEventListener('click', () => recordScore(i));
+    b.addEventListener('click', () => {
+      selectedScore = i;
+      $('scorePanel').querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      $('scoreOk').disabled = false;
+    });
     $('scorePanel').appendChild(b);
   }
+  const okBtn = document.createElement('button');
+  okBtn.id = 'scoreOk';
+  okBtn.textContent = 'OK';
+  okBtn.disabled = true;
+  okBtn.addEventListener('click', () => {
+    if (selectedScore != null) recordScore(selectedScore);
+  });
+  $('scorePanel').appendChild(okBtn);
 
   let curMinute = 0;
   function showScorePanel(alertIdx, elapsedStr) {
     curAlert = alertIdx;
     curElapsed = elapsedStr;
     curMinute = Math.round(alertIdx * intervalMs / 60000 * 100) / 100;  // 시트의 분(min) 열 번호
+    selectedScore = null;
+    $('scoreOk').disabled = true;
+    $('scorePanel').querySelectorAll('button').forEach(x => x.classList.remove('sel'));
     $('scorePanel').classList.add('show');
   }
   function hideScorePanel() {
