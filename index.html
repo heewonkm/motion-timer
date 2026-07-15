@@ -206,9 +206,9 @@
     border-radius: 20px;
     padding: 12px;
     display: none;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 8px;
-    width: min(92vw, 430px);
+    width: min(92vw, 460px);
     box-shadow: 0 12px 44px rgba(0, 0, 0, 0.5);
   }
   #scorePanel.show { display: grid; }
@@ -797,8 +797,8 @@
   $('sheetUrl').addEventListener('change', loadSubjects);
   loadSubjects();
 
-  // 1~10 버튼 생성
-  for (let i = 1; i <= 10; i++) {
+  // 0~10 버튼 생성
+  for (let i = 0; i <= 10; i++) {
     const b = document.createElement('button');
     b.textContent = i;
     b.addEventListener('click', () => recordScore(i));
