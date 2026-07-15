@@ -1,5 +1,13 @@
-const CACHE = 'motion-timer-v1';
-const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-512.png'];
+const CACHE = 'motion-timer-v4';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './icon-180.png',
+  './icon-512.png',
+  './pdf.min.js',
+  './pdf.worker.min.js'
+];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -15,19 +23,34 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// HTML(페이지 진입)은 네트워크 우선 → 항상 최신, 오프라인이면 캐시.
+// 나머지(라이브러리, 아이콘)는 캐시 우선 → 빠르고 오프라인 안전.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const isNavigation = e.request.mode === 'navigate';
+
+  if (isNavigation) {
+    e.respondWith(
+      fetch(e.request)
+        .then((resp) => {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => { c.put('./', copy.clone()); c.put('./index.html', copy); });
+          return resp;
+        })
+        .catch(() => caches.match('./index.html', { ignoreSearch: true }))
+    );
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(
       (cached) =>
         cached ||
-        fetch(e.request)
-          .then((resp) => {
-            const copy = resp.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
-            return resp;
-          })
-          .catch(() => caches.match('./index.html'))
+        fetch(e.request).then((resp) => {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+          return resp;
+        })
     )
   );
 });
