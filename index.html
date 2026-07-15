@@ -177,20 +177,46 @@
     -webkit-touch-callout: none;
   }
   #rStart { color: #0e1020; background: var(--glow); border: none; }
-  #rStop {
-    position: relative;
-    overflow: hidden;
-    color: #ffb4b4;
-  }
-  #rStop .hold-bar {
+  .holdable { position: relative; overflow: hidden; }
+  .holdable .hold-bar {
     position: absolute;
     inset: 0;
     width: 0%;
     background: rgba(255, 90, 90, 0.45);
     border-radius: 999px;
   }
-  #rStop.holding .hold-bar { width: 100%; transition: width 2.5s linear; }
-  #rStop span { position: relative; z-index: 1; }
+  .holdable.holding .hold-bar { width: 100%; transition: width var(--hold-ms, 2.5s) linear; }
+  .holdable span { position: relative; z-index: 1; }
+  #rStop { color: #ffb4b4; }
+  #rBack { color: var(--dim); }
+  #rBack .hold-bar { background: rgba(124, 156, 255, 0.4); }
+
+  /* ---- 안내 모달 ---- */
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0, 0, 0, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal.show { display: flex; }
+  .modal-box {
+    background: var(--panel);
+    border-radius: 20px;
+    padding: 22px;
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+  }
+  .modal-box p { font-size: 15px; line-height: 1.6; }
+  #askGo { background: var(--accent); color: #0e1020; }
 
   /* ---- 설문 화면 ---- */
   #surveyView {
@@ -429,11 +455,21 @@
   <div id="pdfLoading">책을 여는 중…</div>
 </div>
 <div id="readCtrl">
+  <button id="rBack" class="holdable" style="--hold-ms:1.5s"><span>‹ 꾹 눌러 뒤로</span><div class="hold-bar"></div></button>
   <button id="rSurvey">📋</button>
   <button id="rZoomOut">－</button>
   <button id="rZoomIn">＋</button>
   <button id="rStart">▶ 시작</button>
-  <button id="rStop" hidden><span>꾹 눌러 종료</span><div class="hold-bar"></div></button>
+  <button id="rStop" class="holdable" hidden><span>꾹 눌러 종료</span><div class="hold-bar"></div></button>
+</div>
+
+<!-- 실험 전 설문 안내 모달 -->
+<div class="modal" id="askSurvey">
+  <div class="modal-box">
+    <p id="askSurveyMsg">실험 전 설문이 아직 미완료예요.</p>
+    <button id="askGo">📋 설문 하기</button>
+    <button id="askSkip">설문 없이 진행</button>
+  </div>
 </div>
 
 <!-- 설문 화면 -->
@@ -575,10 +611,15 @@
         !confirm('피험자가 선택되지 않았어요. 그래도 시작할까요?\n(기록은 시트 맨 아래 "미분류"로 저장돼요)')) return;
     const sd = getSurveyDone();
     const preTodo = SURVEYS.filter(s => s.phase === '실험 전' && !sd[s.id]).length;
-    if (preTodo > 0 && confirm('실험 전 설문 ' + preTodo + '개가 아직 미완료예요.\n설문 화면을 먼저 열까요?\n(취소를 누르면 그냥 시작해요)')) {
-      openSurveyList();
+    if (preTodo > 0) {
+      $('askSurveyMsg').textContent = '실험 전 설문 ' + preTodo + '개가 아직 미완료예요.';
+      $('askSurvey').classList.add('show');
       return;
     }
+    proceedStart();
+  }
+
+  function proceedStart() {
     if (bookData) {
       // 책 모드: 책만 먼저 열고, 타이머는 책 화면의 ▶ 시작 버튼으로
       reading = true;
@@ -640,6 +681,7 @@
     $('rStart').hidden = false;
     $('rZoomIn').hidden = false;
     $('rZoomOut').hidden = false;
+    $('rBack').hidden = false;
     $('rStop').hidden = true;
     $('rStop').querySelector('span').textContent = '꾹 눌러 종료';
     $('pdfScroll').innerHTML = '';
@@ -1128,34 +1170,38 @@
     $('rStart').hidden = true;
     $('rZoomIn').hidden = true;
     $('rZoomOut').hidden = true;
+    $('rBack').hidden = true;
     $('rStop').hidden = false;
     beginTimer();
   });
 
-  // 종료는 2.5초 동안 꾹 눌러야 동작 (실수 방지)
-  const HOLD_MS = 2500;
-  let holdTimer = null;
-  const rStop = $('rStop');
-  function holdCancel() {
-    clearTimeout(holdTimer);
-    holdTimer = null;
-    rStop.classList.remove('holding');
+  // 꾹 눌러야 동작하는 버튼 (실수 방지)
+  function bindHold(btn, ms, action) {
+    let t = null;
+    const cancel = () => { clearTimeout(t); t = null; btn.classList.remove('holding'); };
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      btn.setPointerCapture(e.pointerId);
+      btn.classList.add('holding');
+      clearTimeout(t);
+      t = setTimeout(() => { cancel(); action(); }, ms);
+    });
+    btn.addEventListener('pointerup', cancel);
+    btn.addEventListener('pointercancel', cancel);
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
   }
-  rStop.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    rStop.setPointerCapture(e.pointerId);
-    rStop.classList.add('holding');
-    clearTimeout(holdTimer);
-    holdTimer = setTimeout(() => {
-      holdCancel();
-      stopTimer();
-      stopFlash();
-      exitReading();
-    }, HOLD_MS);
+  bindHold($('rStop'), 2500, () => { stopTimer(); stopFlash(); exitReading(); });
+  bindHold($('rBack'), 1500, () => { stopFlash(); exitReading(); });
+
+  // 설문 안내 모달 버튼
+  $('askGo').addEventListener('click', () => {
+    $('askSurvey').classList.remove('show');
+    openSurveyList();
   });
-  rStop.addEventListener('pointerup', holdCancel);
-  rStop.addEventListener('pointercancel', holdCancel);
-  rStop.addEventListener('contextmenu', (e) => e.preventDefault());
+  $('askSkip').addEventListener('click', () => {
+    $('askSurvey').classList.remove('show');
+    proceedStart();
+  });
 
   // ---- 버튼 ----
   $('startBtn').addEventListener('click', start);
