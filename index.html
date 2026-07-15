@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="멀미타이머">
+<meta name="theme-color" content="#12141c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>멀미 타이머</title>
+<style>
+  :root {
+    --bg: #12141c;
+    --panel: #1c1f2b;
+    --text: #e8eaf2;
+    --dim: #8a8fa3;
+    --accent: #7c9cff;
+    --glow: #ffd9a0;
+    --done: #9ff0c0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Apple SD Gothic Neo", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .view { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 18px; }
+  .view.active { display: flex; }
+
+  h1 { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: -0.3px; }
+  h1 span { color: var(--accent); }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 13px; color: var(--dim); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  input[type="number"] {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid #2c3040;
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    padding: 12px;
+    outline: none;
+  }
+  input[type="number"]:focus { border-color: var(--accent); }
+  .unit { color: var(--dim); font-size: 15px; width: 28px; }
+
+  button {
+    border: none;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 700;
+    padding: 15px;
+    cursor: pointer;
+    color: var(--text);
+    background: var(--panel);
+  }
+  button:active { opacity: 0.7; }
+  .primary { background: var(--accent); color: #0e1020; }
+  .ghost { background: transparent; color: var(--dim); font-weight: 500; font-size: 14px; padding: 8px; }
+  .danger { color: #ff9d9d; }
+
+  /* ---- 실행 화면 ---- */
+  #runView { align-items: center; text-align: center; gap: 10px; }
+  .count-label { font-size: 13px; color: var(--dim); }
+  #nextIn {
+    font-size: clamp(44px, 18vw, 76px);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+  #alertCount { font-size: 15px; color: var(--accent); font-weight: 600; }
+  .total-line { font-size: 14px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+  .bar {
+    width: 100%;
+    height: 6px;
+    background: var(--panel);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar > div {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.5s linear;
+  }
+
+  .run-buttons { display: flex; gap: 10px; width: 100%; margin-top: 6px; }
+  .run-buttons button { flex: 1; }
+
+  /* ---- 반짝임 오버레이 ---- */
+  #flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 10;
+  }
+  #flash.on { opacity: 1; }
+  #flash .glow-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 45%;
+    background: radial-gradient(ellipse 120% 100% at 50% 0%, var(--glow-color, var(--glow)) 0%, transparent 70%);
+    animation: none;
+  }
+  #flash.on .glow-top { animation: pulse 1.4s ease-in-out infinite; }
+  #flash .glow-edge {
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 60px 12px var(--glow-color, var(--glow));
+    border-radius: 0;
+    animation: none;
+  }
+  #flash.on .glow-edge { animation: pulse 1.4s ease-in-out infinite; animation-delay: 0.2s; }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.15; }
+    50% { opacity: 0.55; }
+  }
+  #flash .flash-msg {
+    position: absolute;
+    top: 12%;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--glow-color, var(--glow));
+    text-shadow: 0 0 20px var(--glow-color, var(--glow));
+    animation: none;
+  }
+  #flash.on .flash-msg { animation: pulse 1.4s ease-in-out infinite; }
+
+  /* ---- 완료 화면 ---- */
+  #doneView { align-items: center; text-align: center; }
+  #doneView .big { font-size: 30px; font-weight: 800; color: var(--done); }
+  #doneView .sub { font-size: 15px; color: var(--dim); }
+
+  .hint { font-size: 12px; color: var(--dim); text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- 설정 화면 -->
+<div class="view active" id="setupView">
+  <h1>멀미 <span>타이머</span></h1>
+  <div class="field">
+    <label>전체 측정 시간</label>
+    <div class="row">
+      <input type="number" id="totalMin" value="30" min="1" max="600" inputmode="decimal">
+      <span class="unit">분</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>알림 간격</label>
+    <div class="row">
+      <input type="number" id="intervalMin" value="1" min="0.1" max="120" step="0.5" inputmode="decimal">
+      <span class="unit">분</span>
+    </div>
+  </div>
+  <div class="field">
+    <label>반짝임 지속 시간</label>
+    <div class="row">
+      <input type="number" id="flashSec" value="6" min="2" max="60" inputmode="numeric">
+      <span class="unit">초</span>
+    </div>
+  </div>
+  <button class="primary" id="startBtn">시작</button>
+  <button class="ghost" id="previewBtn">✨ 반짝임 미리보기</button>
+  <p class="hint">측정 중에는 화면이 꺼지지 않도록 유지돼요.<br>이 창이 화면에 보여야 타이머가 정확히 작동해요.</p>
+</div>
+
+<!-- 실행 화면 -->
+<div class="view" id="runView">
+  <div class="count-label">다음 알림까지</div>
+  <div id="nextIn">1:00</div>
+  <div id="alertCount">1번째 알림 대기</div>
+  <div class="bar"><div id="progress"></div></div>
+  <div class="total-line" id="totalLine">0:00 / 30:00</div>
+  <div class="run-buttons">
+    <button id="pauseBtn">일시정지</button>
+    <button class="danger" id="stopBtn">종료</button>
+  </div>
+</div>
+
+<!-- 완료 화면 -->
+<div class="view" id="doneView">
+  <div class="big">측정 완료</div>
+  <div class="sub" id="doneSummary"></div>
+  <button class="primary" id="againBtn">다시 시작</button>
+</div>
+
+<!-- 반짝임 오버레이 -->
+<div id="flash">
+  <div class="glow-top"></div>
+  <div class="glow-edge"></div>
+  <div class="flash-msg" id="flashMsg">기록하세요</div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const views = { setup: $('setupView'), run: $('runView'), done: $('doneView') };
+
+  let startTime = 0;        // 측정 시작 시각 (ms)
+  let pausedAt = 0;         // 일시정지 시각 (0이면 진행 중)
+  let totalMs = 0;
+  let intervalMs = 0;
+  let flashMs = 6000;
+  let nextAlertIdx = 1;     // 다음에 울릴 알림 번호 (1부터)
+  let tickTimer = null;
+  let flashTimer = null;
+  let wakeLock = null;
+
+  function show(name) {
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    views[name].classList.add('active');
+  }
+
+  function fmt(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m + ':' + String(r).padStart(2, '0');
+  }
+
+  // ---- 화면 꺼짐 방지 ----
+  async function acquireWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) { /* 지원 안 되면 무시 */ }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && tickTimer) acquireWakeLock();
+  });
+
+  // ---- 반짝임 ----
+  function flash(message, color, durationMs) {
+    const el = $('flash');
+    el.style.setProperty('--glow-color', color);
+    $('flashMsg').textContent = message;
+    el.classList.add('on');
+    clearTimeout(flashTimer);
+    flashTimer = setTimeout(() => el.classList.remove('on'), durationMs);
+  }
+  function stopFlash() {
+    clearTimeout(flashTimer);
+    $('flash').classList.remove('on');
+  }
+
+  // ---- 타이머 루프 ----
+  function tick() {
+    const elapsed = Date.now() - startTime;
+
+    // 놓친 알림 없이 순서대로 처리 (탭 스로틀 대비)
+    while (nextAlertIdx * intervalMs <= elapsed && nextAlertIdx * intervalMs < totalMs) {
+      flash(nextAlertIdx + '번째 · 기록하세요', getComputedStyle(document.documentElement).getPropertyValue('--glow'), flashMs);
+      nextAlertIdx++;
+    }
+
+    if (elapsed >= totalMs) {
+      finish();
+      return;
+    }
+
+    const nextAt = Math.min(nextAlertIdx * intervalMs, totalMs);
+    $('nextIn').textContent = fmt(nextAt - elapsed);
+    $('alertCount').textContent = nextAlertIdx * intervalMs >= totalMs
+      ? '마지막 · 종료 대기'
+      : nextAlertIdx + '번째 알림 대기';
+    $('totalLine').textContent = fmt(elapsed) + ' / ' + fmt(totalMs);
+    $('progress').style.width = Math.min(100, elapsed / totalMs * 100) + '%';
+  }
+
+  function start() {
+    const total = parseFloat($('totalMin').value);
+    const interval = parseFloat($('intervalMin').value);
+    const fsec = parseFloat($('flashSec').value);
+    if (!(total > 0) || !(interval > 0)) { alert('시간과 간격을 확인해주세요.'); return; }
+
+    totalMs = total * 60000;
+    intervalMs = interval * 60000;
+    flashMs = (fsec > 0 ? fsec : 6) * 1000;
+    startTime = Date.now();
+    pausedAt = 0;
+    nextAlertIdx = 1;
+
+    show('run');
+    $('pauseBtn').textContent = '일시정지';
+    acquireWakeLock();
+    clearInterval(tickTimer);
+    tickTimer = setInterval(tick, 250);
+    tick();
+  }
+
+  function pauseResume() {
+    if (!tickTimer && !pausedAt) return;
+    if (pausedAt) {
+      // 재개: 멈춰 있던 시간만큼 시작점을 뒤로 밀기
+      startTime += Date.now() - pausedAt;
+      pausedAt = 0;
+      tickTimer = setInterval(tick, 250);
+      $('pauseBtn').textContent = '일시정지';
+      acquireWakeLock();
+    } else {
+      clearInterval(tickTimer);
+      tickTimer = null;
+      pausedAt = Date.now();
+      stopFlash();
+      $('pauseBtn').textContent = '재개';
+      $('nextIn').textContent = '⏸';
+    }
+  }
+
+  function finish() {
+    const alertsFired = nextAlertIdx - 1;
+    stopTimer();
+    $('doneSummary').textContent =
+      fmt(totalMs) + ' 동안 알림 ' + alertsFired + '회';
+    show('done');
+    flash('측정 완료', getComputedStyle(document.documentElement).getPropertyValue('--done'), 10000);
+  }
+
+  function stopTimer() {
+    clearInterval(tickTimer);
+    tickTimer = null;
+    pausedAt = 0;
+    releaseWakeLock();
+  }
+
+  $('startBtn').addEventListener('click', start);
+  $('previewBtn').addEventListener('click', () =>
+    flash('이렇게 반짝여요', getComputedStyle(document.documentElement).getPropertyValue('--glow'),
+      (parseFloat($('flashSec').value) || 6) * 1000));
+  $('pauseBtn').addEventListener('click', pauseResume);
+  $('stopBtn').addEventListener('click', () => {
+    if (confirm('측정을 종료할까요?')) { stopTimer(); stopFlash(); show('setup'); }
+  });
+  $('againBtn').addEventListener('click', () => { stopFlash(); show('setup'); });
+})();
+
+// 오프라인 사용을 위한 캐싱 (https로 접속했을 때만 동작)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
