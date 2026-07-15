@@ -36,7 +36,7 @@
     -webkit-user-select: none;
   }
 
-  .view { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 18px; }
+  .view { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 16px; }
   .view.active { display: flex; }
 
   h1 { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: -0.3px; }
@@ -75,7 +75,11 @@
   .ghost { background: transparent; color: var(--dim); font-weight: 500; font-size: 14px; padding: 8px; }
   .danger { color: #ff9d9d; }
 
-  /* ---- 실행 화면 ---- */
+  #pdfStatus { font-size: 13px; color: var(--dim); }
+  #pdfStatus b { color: var(--done); font-weight: 600; }
+  #pdfStatus .rm { color: #ff9d9d; margin-left: 8px; text-decoration: underline; cursor: pointer; }
+
+  /* ---- 실행 화면 (타이머 단독) ---- */
   #runView { align-items: center; text-align: center; gap: 10px; }
   .count-label { font-size: 13px; color: var(--dim); }
   #nextIn {
@@ -88,23 +92,78 @@
   #alertCount { font-size: 15px; color: var(--accent); font-weight: 600; }
   .total-line { font-size: 14px; color: var(--dim); font-variant-numeric: tabular-nums; }
 
-  .bar {
-    width: 100%;
-    height: 6px;
-    background: var(--panel);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .bar > div {
-    height: 100%;
-    width: 0%;
-    background: var(--accent);
-    border-radius: 3px;
-    transition: width 0.5s linear;
-  }
+  .bar { width: 100%; height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0%; background: var(--accent); border-radius: 3px; transition: width 0.5s linear; }
 
   .run-buttons { display: flex; gap: 10px; width: 100%; margin-top: 6px; }
   .run-buttons button { flex: 1; }
+
+  /* ---- 책 읽기 화면 ---- */
+  #readView {
+    position: fixed;
+    inset: 0;
+    background: #0b0c11;
+    display: none;
+    z-index: 5;
+  }
+  #readView.active { display: block; }
+  #pdfScroll {
+    position: absolute;
+    inset: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: calc(env(safe-area-inset-top) + 52px) 8px calc(env(safe-area-inset-bottom) + 20px);
+  }
+  .pageBox {
+    margin: 0 auto 10px;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+    border-radius: 2px;
+  }
+  .pageBox canvas { display: block; width: 100%; height: 100%; border-radius: 2px; }
+  #pdfLoading {
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    text-align: center;
+    color: var(--dim);
+    font-size: 15px;
+  }
+
+  #pill {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    right: 12px;
+    z-index: 20;
+    background: rgba(18, 20, 30, 0.82);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    padding: 9px 14px;
+    display: none;
+  }
+  #readView.active ~ #pill { display: block; }
+
+  #pillMenu {
+    position: fixed;
+    top: calc(max(10px, env(safe-area-inset-top)) + 46px);
+    right: 12px;
+    z-index: 21;
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    width: 190px;
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.55);
+  }
+  #pillMenu.open { display: flex; }
+  #pillMenu button { padding: 11px; font-size: 14px; background: #262a3a; }
 
   /* ---- 반짝임 오버레이 ---- */
   #flash {
@@ -112,7 +171,7 @@
     inset: 0;
     pointer-events: none;
     opacity: 0;
-    z-index: 10;
+    z-index: 40;
   }
   #flash.on { opacity: 1; }
   #flash .glow-top {
@@ -120,15 +179,12 @@
     top: 0; left: 0; right: 0;
     height: 45%;
     background: radial-gradient(ellipse 120% 100% at 50% 0%, var(--glow-color, var(--glow)) 0%, transparent 70%);
-    animation: none;
   }
   #flash.on .glow-top { animation: pulse 1.4s ease-in-out infinite; }
   #flash .glow-edge {
     position: absolute;
     inset: 0;
     box-shadow: inset 0 0 60px 12px var(--glow-color, var(--glow));
-    border-radius: 0;
-    animation: none;
   }
   #flash.on .glow-edge { animation: pulse 1.4s ease-in-out infinite; animation-delay: 0.2s; }
   @keyframes pulse {
@@ -144,7 +200,6 @@
     font-weight: 700;
     color: var(--glow-color, var(--glow));
     text-shadow: 0 0 20px var(--glow-color, var(--glow));
-    animation: none;
   }
   #flash.on .flash-msg { animation: pulse 1.4s ease-in-out infinite; }
 
@@ -182,12 +237,18 @@
       <span class="unit">초</span>
     </div>
   </div>
+  <div class="field">
+    <label>책 PDF — 넣으면 앱 안에서 책이 열리고, 불빛이 책 위로 나타나요</label>
+    <button id="pdfBtn" type="button">📖 책 PDF 선택</button>
+    <input type="file" id="pdfInput" accept="application/pdf,.pdf" style="display:none">
+    <div id="pdfStatus"></div>
+  </div>
   <button class="primary" id="startBtn">시작</button>
   <button class="ghost" id="previewBtn">✨ 반짝임 미리보기</button>
-  <p class="hint">측정 중에는 화면이 꺼지지 않도록 유지돼요.<br>이 창이 화면에 보여야 타이머가 정확히 작동해요.</p>
+  <p class="hint">측정 중에는 화면이 꺼지지 않도록 유지돼요.</p>
 </div>
 
-<!-- 실행 화면 -->
+<!-- 실행 화면 (책 없이 타이머만) -->
 <div class="view" id="runView">
   <div class="count-label">다음 알림까지</div>
   <div id="nextIn">1:00</div>
@@ -207,6 +268,19 @@
   <button class="primary" id="againBtn">다시 시작</button>
 </div>
 
+<!-- 책 읽기 화면 -->
+<div id="readView">
+  <div id="pdfScroll"></div>
+  <div id="pdfLoading">책을 여는 중…</div>
+</div>
+<button id="pill">✨ --:--</button>
+<div id="pillMenu">
+  <button id="mPause">일시정지</button>
+  <button id="mZoomIn">확대 ＋</button>
+  <button id="mZoomOut">축소 －</button>
+  <button id="mStop" class="danger">측정 종료</button>
+</div>
+
 <!-- 반짝임 오버레이 -->
 <div id="flash">
   <div class="glow-top"></div>
@@ -219,34 +293,33 @@
   const $ = (id) => document.getElementById(id);
   const views = { setup: $('setupView'), run: $('runView'), done: $('doneView') };
 
-  let startTime = 0;        // 측정 시작 시각 (ms)
-  let pausedAt = 0;         // 일시정지 시각 (0이면 진행 중)
+  let startTime = 0;
+  let pausedAt = 0;
   let totalMs = 0;
   let intervalMs = 0;
   let flashMs = 6000;
-  let nextAlertIdx = 1;     // 다음에 울릴 알림 번호 (1부터)
+  let nextAlertIdx = 1;
   let tickTimer = null;
   let flashTimer = null;
   let wakeLock = null;
+  let reading = false;      // 책 읽기 모드 여부
 
   function show(name) {
     Object.values(views).forEach(v => v.classList.remove('active'));
-    views[name].classList.add('active');
+    if (name) views[name].classList.add('active');
   }
-
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name);
+  }
   function fmt(ms) {
     const s = Math.max(0, Math.ceil(ms / 1000));
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return m + ':' + String(r).padStart(2, '0');
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   }
 
   // ---- 화면 꺼짐 방지 ----
   async function acquireWakeLock() {
     try {
-      if ('wakeLock' in navigator) {
-        wakeLock = await navigator.wakeLock.request('screen');
-      }
+      if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
     } catch (e) { /* 지원 안 되면 무시 */ }
   }
   function releaseWakeLock() {
@@ -274,24 +347,24 @@
   function tick() {
     const elapsed = Date.now() - startTime;
 
-    // 놓친 알림 없이 순서대로 처리 (탭 스로틀 대비)
     while (nextAlertIdx * intervalMs <= elapsed && nextAlertIdx * intervalMs < totalMs) {
-      flash(nextAlertIdx + '번째 · 기록하세요', getComputedStyle(document.documentElement).getPropertyValue('--glow'), flashMs);
+      flash(nextAlertIdx + '번째 · 기록하세요', cssVar('--glow'), flashMs);
       nextAlertIdx++;
     }
 
-    if (elapsed >= totalMs) {
-      finish();
-      return;
-    }
+    if (elapsed >= totalMs) { finish(); return; }
 
     const nextAt = Math.min(nextAlertIdx * intervalMs, totalMs);
-    $('nextIn').textContent = fmt(nextAt - elapsed);
-    $('alertCount').textContent = nextAlertIdx * intervalMs >= totalMs
-      ? '마지막 · 종료 대기'
-      : nextAlertIdx + '번째 알림 대기';
-    $('totalLine').textContent = fmt(elapsed) + ' / ' + fmt(totalMs);
-    $('progress').style.width = Math.min(100, elapsed / totalMs * 100) + '%';
+    if (reading) {
+      $('pill').textContent = '✨ ' + fmt(nextAt - elapsed) + ' · ' + fmt(elapsed) + '/' + fmt(totalMs);
+    } else {
+      $('nextIn').textContent = fmt(nextAt - elapsed);
+      $('alertCount').textContent = nextAlertIdx * intervalMs >= totalMs
+        ? '마지막 · 종료 대기'
+        : nextAlertIdx + '번째 알림 대기';
+      $('totalLine').textContent = fmt(elapsed) + ' / ' + fmt(totalMs);
+      $('progress').style.width = Math.min(100, elapsed / totalMs * 100) + '%';
+    }
   }
 
   function start() {
@@ -307,8 +380,16 @@
     pausedAt = 0;
     nextAlertIdx = 1;
 
-    show('run');
+    if (bookData) {
+      reading = true;
+      show(null);
+      enterReading();
+    } else {
+      reading = false;
+      show('run');
+    }
     $('pauseBtn').textContent = '일시정지';
+    $('mPause').textContent = '일시정지';
     acquireWakeLock();
     clearInterval(tickTimer);
     tickTimer = setInterval(tick, 250);
@@ -318,11 +399,11 @@
   function pauseResume() {
     if (!tickTimer && !pausedAt) return;
     if (pausedAt) {
-      // 재개: 멈춰 있던 시간만큼 시작점을 뒤로 밀기
       startTime += Date.now() - pausedAt;
       pausedAt = 0;
       tickTimer = setInterval(tick, 250);
       $('pauseBtn').textContent = '일시정지';
+      $('mPause').textContent = '일시정지';
       acquireWakeLock();
     } else {
       clearInterval(tickTimer);
@@ -330,17 +411,22 @@
       pausedAt = Date.now();
       stopFlash();
       $('pauseBtn').textContent = '재개';
-      $('nextIn').textContent = '⏸';
+      $('mPause').textContent = '▶ 재개';
+      if (reading) $('pill').textContent = '⏸ 일시정지됨';
+      else $('nextIn').textContent = '⏸';
     }
   }
 
   function finish() {
     const alertsFired = nextAlertIdx - 1;
     stopTimer();
-    $('doneSummary').textContent =
-      fmt(totalMs) + ' 동안 알림 ' + alertsFired + '회';
-    show('done');
-    flash('측정 완료', getComputedStyle(document.documentElement).getPropertyValue('--done'), 10000);
+    flash('측정 완료', cssVar('--done'), 10000);
+    if (reading) {
+      $('pill').textContent = '✅ 완료 · 알림 ' + alertsFired + '회';
+    } else {
+      $('doneSummary').textContent = fmt(totalMs) + ' 동안 알림 ' + alertsFired + '회';
+      show('done');
+    }
   }
 
   function stopTimer() {
@@ -350,10 +436,226 @@
     releaseWakeLock();
   }
 
+  function exitReading() {
+    reading = false;
+    $('readView').classList.remove('active');
+    $('pill').style.display = 'none';
+    $('pillMenu').classList.remove('open');
+    $('pdfScroll').innerHTML = '';
+    if (pdfDoc) { pdfDoc.destroy().catch(() => {}); pdfDoc = null; }
+    show('setup');
+  }
+
+  // ================= 책(PDF) =================
+  let bookData = null;   // { name, buffer }
+  let pdfDoc = null;
+  let zoom = 1;
+  let baseW = 0, baseH = 0;
+
+  // -- IndexedDB에 책 저장 (다음에 또 쓰게) --
+  function idb() {
+    return new Promise((res, rej) => {
+      const q = indexedDB.open('motion-timer', 1);
+      q.onupgradeneeded = () => q.result.createObjectStore('kv');
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => rej(q.error);
+    });
+  }
+  async function kvSet(k, v) {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(v, k);
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+  async function kvGet(k) {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const q = db.transaction('kv').objectStore('kv').get(k);
+      q.onsuccess = () => res(q.result);
+      q.onerror = () => rej(q.error);
+    });
+  }
+  async function kvDel(k) {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').delete(k);
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+
+  function setBook(book, save) {
+    bookData = book;
+    const st = $('pdfStatus');
+    if (book) {
+      st.innerHTML = '선택된 책: <b></b><span class="rm">제거</span>';
+      st.querySelector('b').textContent = book.name;
+      st.querySelector('.rm').addEventListener('click', () => {
+        kvDel('book').catch(() => {});
+        setBook(null);
+      });
+      if (save) kvSet('book', book).catch(() => {});
+    } else {
+      st.textContent = '';
+    }
+  }
+  kvGet('book').then(b => { if (b) setBook(b, false); }).catch(() => {});
+
+  $('pdfBtn').addEventListener('click', () => $('pdfInput').click());
+  $('pdfInput').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const buffer = await f.arrayBuffer();
+    setBook({ name: f.name, buffer }, true);
+    e.target.value = '';
+  });
+  // 자동 테스트용 훅
+  window.__setBook = (name, buffer) => setBook({ name, buffer }, true);
+
+  // -- pdf.js 로딩 (필요할 때 한 번만) --
+  let pdfjsReady = null;
+  function loadPdfjs() {
+    if (!pdfjsReady) {
+      pdfjsReady = new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'pdf.min.js';
+        s.onload = () => {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+          res(window.pdfjsLib);
+        };
+        s.onerror = () => { pdfjsReady = null; rej(new Error('pdf.js 로딩 실패')); };
+        document.head.appendChild(s);
+      });
+    }
+    return pdfjsReady;
+  }
+
+  // -- PDF 렌더링 (보이는 페이지만 그려서 메모리 절약) --
+  async function enterReading() {
+    $('readView').classList.add('active');
+    $('pill').style.display = 'block';
+    $('pdfLoading').style.display = 'block';
+    try {
+      const pdfjs = await loadPdfjs();
+      pdfDoc = await pdfjs.getDocument({ data: bookData.buffer.slice(0) }).promise;
+      const p1 = await pdfDoc.getPage(1);
+      const vp = p1.getViewport({ scale: 1 });
+      baseW = vp.width;
+      baseH = vp.height;
+      $('pdfLoading').style.display = 'none';
+      buildPages();
+    } catch (err) {
+      $('pdfLoading').textContent = '책을 열지 못했어요: ' + (err && err.message ? err.message : err);
+    }
+  }
+
+  function pageWidthPx() {
+    return Math.min($('pdfScroll').clientWidth - 16, 1000) * zoom;
+  }
+
+  function buildPages() {
+    const scroll = $('pdfScroll');
+    const ratio = scroll.scrollHeight > 0 ? scroll.scrollTop / scroll.scrollHeight : 0;
+    scroll.innerHTML = '';
+    const w = pageWidthPx();
+    const h = w * baseH / baseW;
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const box = document.createElement('div');
+      box.className = 'pageBox';
+      box.dataset.page = i;
+      box.style.width = w + 'px';
+      box.style.height = h + 'px';
+      scroll.appendChild(box);
+    }
+    scroll.scrollTop = ratio * scroll.scrollHeight;
+    updateVisiblePages();
+  }
+
+  // 스크롤 위치 기준으로 근처 페이지만 그리고, 먼 페이지는 메모리에서 해제
+  function updateVisiblePages() {
+    const scroll = $('pdfScroll');
+    if (!pdfDoc) return;
+    const margin = (scroll.clientHeight || 800) * 2;
+    const top = scroll.scrollTop - margin;
+    const bottom = scroll.scrollTop + (scroll.clientHeight || 800) + margin;
+    for (const box of scroll.children) {
+      const boxTop = box.offsetTop;
+      const boxBottom = boxTop + box.offsetHeight;
+      if (boxBottom >= top && boxTop <= bottom) {
+        renderPage(box, +box.dataset.page);
+      } else if (box.dataset.rendered) {
+        box.innerHTML = '';
+        box.dataset.rendered = '';
+      }
+    }
+  }
+  let scrollThrottle = 0;
+  $('pdfScroll').addEventListener('scroll', () => {
+    if (scrollThrottle) return;
+    scrollThrottle = setTimeout(() => { scrollThrottle = 0; updateVisiblePages(); }, 120);
+  });
+
+  async function renderPage(box, n) {
+    if (!pdfDoc || box.dataset.rendered === String(zoom)) return;
+    box.dataset.rendered = String(zoom);
+    try {
+      const page = await pdfDoc.getPage(n);
+      const scale = pageWidthPx() / page.getViewport({ scale: 1 }).width;
+      const vp = page.getViewport({ scale });
+      box.style.height = vp.height + 'px';
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.floor(vp.width * dpr);
+      canvas.height = Math.floor(vp.height * dpr);
+      // intent:'print' — requestAnimationFrame에 의존하지 않아
+      // 앱이 잠시 가려져 있어도 렌더링이 멈추지 않음
+      await page.render({
+        canvasContext: canvas.getContext('2d'),
+        viewport: page.getViewport({ scale: scale * dpr }),
+        intent: 'print'
+      }).promise;
+      if (box.dataset.rendered === String(zoom)) {
+        box.innerHTML = '';
+        box.appendChild(canvas);
+      }
+    } catch (e) {
+      box.dataset.rendered = '';
+    }
+  }
+
+  function setZoom(z) {
+    zoom = Math.min(3, Math.max(0.6, z));
+    if (pdfDoc) buildPages();
+  }
+
+  let resizeT = null;
+  window.addEventListener('resize', () => {
+    if (!reading || !pdfDoc) return;
+    clearTimeout(resizeT);
+    resizeT = setTimeout(buildPages, 300);
+  });
+
+  // ---- 알약(pill) 메뉴 ----
+  $('pill').addEventListener('click', () => $('pillMenu').classList.toggle('open'));
+  $('mPause').addEventListener('click', () => { pauseResume(); $('pillMenu').classList.remove('open'); });
+  $('mZoomIn').addEventListener('click', () => setZoom(zoom * 1.2));
+  $('mZoomOut').addEventListener('click', () => setZoom(zoom / 1.2));
+  $('mStop').addEventListener('click', () => {
+    if (confirm('측정을 종료할까요?')) {
+      stopTimer();
+      stopFlash();
+      exitReading();
+    }
+  });
+
+  // ---- 버튼 ----
   $('startBtn').addEventListener('click', start);
   $('previewBtn').addEventListener('click', () =>
-    flash('이렇게 반짝여요', getComputedStyle(document.documentElement).getPropertyValue('--glow'),
-      (parseFloat($('flashSec').value) || 6) * 1000));
+    flash('이렇게 반짝여요', cssVar('--glow'), (parseFloat($('flashSec').value) || 6) * 1000));
   $('pauseBtn').addEventListener('click', pauseResume);
   $('stopBtn').addEventListener('click', () => {
     if (confirm('측정을 종료할까요?')) { stopTimer(); stopFlash(); show('setup'); }
