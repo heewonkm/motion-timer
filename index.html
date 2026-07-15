@@ -70,6 +70,21 @@
     width: 100%;
   }
   input[type="url"]:focus { border-color: var(--accent); }
+  select {
+    background: var(--panel);
+    border: 1px solid #2c3040;
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 17px;
+    font-weight: 600;
+    padding: 12px;
+    outline: none;
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: center;
+  }
+  select:focus { border-color: var(--accent); }
 
   button {
     border: none;
@@ -284,6 +299,21 @@
     <button id="pdfBtn" type="button">📖 책 PDF 선택</button>
     <input type="file" id="pdfInput" accept="application/pdf,.pdf" style="display:none">
     <div id="pdfStatus"></div>
+  </div>
+  <div class="field">
+    <label>시나리오 — 시트의 이 행에 기록돼요</label>
+    <select id="scenario">
+      <option>SLC 오전</option>
+      <option>S&amp;G 오전</option>
+      <option>LW 오전</option>
+      <option>시나리오4 오전</option>
+      <option>시나리오5 오전</option>
+      <option>시나리오4 오후</option>
+      <option>S&amp;G 오후</option>
+      <option>LW 오후</option>
+      <option>SLC 오후</option>
+      <option>시나리오5 오후</option>
+    </select>
   </div>
   <div class="field">
     <label>구글 시트 자동 기록 (선택 — Apps Script 웹 앱 URL)</label>
@@ -715,6 +745,8 @@
 
   $('sheetUrl').value = localStorage.getItem('sheetUrl') || '';
   $('sheetUrl').addEventListener('input', () => localStorage.setItem('sheetUrl', $('sheetUrl').value.trim()));
+  if (localStorage.getItem('scenario')) $('scenario').value = localStorage.getItem('scenario');
+  $('scenario').addEventListener('change', () => localStorage.setItem('scenario', $('scenario').value));
 
   // 1~10 버튼 생성
   for (let i = 1; i <= 10; i++) {
@@ -724,9 +756,11 @@
     $('scorePanel').appendChild(b);
   }
 
+  let curMinute = 0;
   function showScorePanel(alertIdx, elapsedStr) {
     curAlert = alertIdx;
     curElapsed = elapsedStr;
+    curMinute = Math.round(alertIdx * intervalMs / 60000 * 100) / 100;  // 시트의 분(min) 열 번호
     $('scorePanel').classList.add('show');
   }
   function hideScorePanel() {
@@ -735,7 +769,15 @@
 
   function recordScore(score) {
     hideScorePanel();
-    queue.push({ ts: new Date().toISOString(), session: sessionId, alert: curAlert, elapsed: curElapsed, score });
+    queue.push({
+      ts: new Date().toISOString(),
+      session: sessionId,
+      scenario: $('scenario').value,
+      minute: curMinute,
+      alert: curAlert,
+      elapsed: curElapsed,
+      score
+    });
     saveQueue();
     trySend();
   }
@@ -763,6 +805,8 @@
           body: JSON.stringify(queue[0])
         });
         if (!r.ok) throw new Error(r.status);
+        const body = await r.text();
+        if (body.trim() !== 'ok') throw new Error(body);
         queue.shift();
         saveQueue();
       } catch (e) { break; }
@@ -783,12 +827,14 @@
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ ts: new Date().toISOString(), session: 'TEST', alert: 0, elapsed: '0:00', score: '연결 테스트' })
+        body: JSON.stringify({ test: true })
       });
       if (!r.ok) throw new Error('응답 코드 ' + r.status);
-      st.textContent = '✅ 성공! 시트에 테스트 행이 추가됐는지 확인해보세요.';
+      const body = await r.text();
+      if (body.trim() !== 'ok') throw new Error(body);
+      st.textContent = '✅ 성공! 시트 AG1 칸에 "연결 OK"가 적혔는지 확인해보세요.';
     } catch (e) {
-      st.textContent = '❌ 실패 — URL이 맞는지, 배포 설정이 "모든 사용자"인지 확인해주세요.';
+      st.textContent = '❌ 실패 — URL이 맞는지, 배포 설정이 "모든 사용자"인지 확인해주세요. (' + (e.message || e) + ')';
     }
   });
 
