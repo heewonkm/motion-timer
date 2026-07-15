@@ -284,6 +284,48 @@
     padding: 3px 8px;
   }
 
+  /* ---- 설문 링크 설정 화면 ---- */
+  #cfgView {
+    position: fixed;
+    inset: 0;
+    z-index: 26;
+    background: var(--bg);
+    display: none;
+    flex-direction: column;
+  }
+  #cfgView.show { display: flex; }
+  #cfgList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .cfg-item {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cfg-item input {
+    background: #262a3a;
+    border: 1px solid #2c3040;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px;
+    outline: none;
+    width: 100%;
+  }
+  .cfg-item input:focus { border-color: var(--accent); }
+  .cfg-num { font-size: 12px; font-weight: 700; color: var(--accent); }
+  .cfg-row { display: flex; gap: 8px; }
+  .cfg-item select { flex: 1; font-size: 14px; padding: 10px; background: #262a3a; width: auto; }
+  .cfg-del { color: #ff9d9d; background: #262a3a; font-size: 13px; padding: 10px 14px; }
+
   /* ---- 멀미 점수 패널 ---- */
   #scorePanel {
     position: fixed;
@@ -402,7 +444,10 @@
       <button type="button" id="subjectRefresh" style="padding:12px 14px;font-size:16px">↻</button>
     </div>
   </div>
-  <button type="button" id="surveyBtn">📋 설문 (0/6 완료)</button>
+  <div class="row">
+    <button type="button" id="surveyBtn" style="flex:1">📋 설문 (0/6 완료)</button>
+    <button type="button" id="surveyCfgBtn" style="padding:15px 16px">⚙️</button>
+  </div>
   <div class="field">
     <label>시나리오 — 시트의 이 행에 기록돼요</label>
     <select id="scenario">
@@ -481,6 +526,15 @@
   </div>
   <div id="svList"></div>
   <iframe id="svFrame" title="설문"></iframe>
+</div>
+
+<!-- 설문 링크 설정 화면 -->
+<div id="cfgView">
+  <div class="sv-head">
+    <button id="cfgBack">‹ 뒤로</button>
+    <div style="flex:1;text-align:center;font-size:15px;font-weight:700">설문 링크 설정</div>
+  </div>
+  <div id="cfgList"></div>
 </div>
 
 <!-- 멀미 점수 입력 패널 -->
@@ -1058,14 +1112,24 @@
   });
 
   // ================= 설문 =================
-  const SURVEYS = [
-    { id: 'cond',      phase: '실험 전', name: '① 컨디션 평가',        url: 'https://ko.surveymonkey.com/r/7377DYS' },
-    { id: 'mssq',      phase: '실험 전', name: '② MSSQ 멀미 민감도',   url: 'https://ko.surveymonkey.com/r/X7L39Z6' },
-    { id: 'msaq_pre',  phase: '실험 전', name: '③ MSAQ (주행 전)',     url: 'https://ko.surveymonkey.com/r/7372FSP' },
-    { id: 'msaq_mid',  phase: '실험 중', name: '④ MSAQ (주행 중)',     url: 'https://ko.surveymonkey.com/r/X7VHRTN' },
-    { id: 'msaq_post', phase: '실험 후', name: '⑤ MSAQ (주행 후)',     url: 'https://ko.surveymonkey.com/r/X7KCVTK' },
-    { id: 'fss',       phase: '실험 후', name: '⑥ FSS NDRT 몰입도',    url: 'https://ko.surveymonkey.com/r/X7V9XNL' }
+  const PHASES = ['실험 전', '실험 중', '실험 후'];
+  const DEFAULT_SURVEYS = [
+    { id: 'cond',      phase: '실험 전', name: '컨디션 평가',      url: 'https://ko.surveymonkey.com/r/7377DYS' },
+    { id: 'mssq',      phase: '실험 전', name: 'MSSQ 멀미 민감도', url: 'https://ko.surveymonkey.com/r/X7L39Z6' },
+    { id: 'msaq_pre',  phase: '실험 전', name: 'MSAQ (주행 전)',   url: 'https://ko.surveymonkey.com/r/7372FSP' },
+    { id: 'msaq_mid',  phase: '실험 중', name: 'MSAQ (주행 중)',   url: 'https://ko.surveymonkey.com/r/X7VHRTN' },
+    { id: 'msaq_post', phase: '실험 후', name: 'MSAQ (주행 후)',   url: 'https://ko.surveymonkey.com/r/X7KCVTK' },
+    { id: 'fss',       phase: '실험 후', name: 'FSS NDRT 몰입도',  url: 'https://ko.surveymonkey.com/r/X7V9XNL' }
   ];
+  let SURVEYS = (function () {
+    try {
+      const s = JSON.parse(localStorage.getItem('surveyConfig') || 'null');
+      if (Array.isArray(s) && s.length) return s;
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_SURVEYS));
+  })();
+  function saveSurveyCfg() { localStorage.setItem('surveyConfig', JSON.stringify(SURVEYS)); }
+  function orderedSurveys() { return PHASES.flatMap(p => SURVEYS.filter(s => s.phase === p)); }
   let curSurvey = null;
 
   function surveyKey() { return 'surveys:' + ($('subject').value || '공통'); }
@@ -1086,9 +1150,11 @@
     const done = getSurveyDone();
     const wrap = $('svList');
     wrap.innerHTML = '';
-    const firstTodo = SURVEYS.find(s => !done[s.id]);
+    const list = orderedSurveys();
+    const firstTodo = list.find(s => !done[s.id]);
+    let num = 0;
     let lastPhase = '';
-    for (const s of SURVEYS) {
+    for (const s of list) {
       if (s.phase !== lastPhase) {
         const h = document.createElement('div');
         h.className = 'sv-phase';
@@ -1102,8 +1168,9 @@
       const st = document.createElement('span');
       st.className = 'sv-status';
       st.textContent = done[s.id] ? '✅' : '○';
+      num++;
       const nm = document.createElement('span');
-      nm.textContent = s.name;
+      nm.textContent = num + '. ' + (s.name || '(이름 없음)');
       row.appendChild(st);
       row.appendChild(nm);
       if (isNext) {
@@ -1134,6 +1201,7 @@
     $('surveyView').classList.add('show');
   }
   function openSurvey(s) {
+    if (!s.url) { alert('이 설문의 URL이 비어 있어요.\n⚙️ 설문 링크 설정에서 입력해주세요.'); return; }
     curSurvey = s;
     $('svTitle').textContent = s.name;
     $('svDone').textContent = getSurveyDone()[s.id] ? '완료 취소' : '완료로 표시 ✓';
@@ -1159,6 +1227,87 @@
   $('rSurvey').addEventListener('click', openSurveyList);
   $('subject').addEventListener('change', updateSurveyBtn);
   updateSurveyBtn();
+
+  // ---- 설문 링크 설정 ----
+  function renderCfg() {
+    const wrap = $('cfgList');
+    wrap.innerHTML = '';
+    SURVEYS.forEach((s) => {
+      const card = document.createElement('div');
+      card.className = 'cfg-item';
+
+      const nameIn = document.createElement('input');
+      nameIn.value = s.name;
+      nameIn.placeholder = '설문 이름';
+      nameIn.addEventListener('input', () => { s.name = nameIn.value; saveSurveyCfg(); });
+
+      const urlIn = document.createElement('input');
+      urlIn.value = s.url;
+      urlIn.placeholder = 'https://ko.surveymonkey.com/r/…';
+      urlIn.autocapitalize = 'off';
+      urlIn.addEventListener('input', () => { s.url = urlIn.value.trim(); saveSurveyCfg(); });
+
+      const row = document.createElement('div');
+      row.className = 'cfg-row';
+      const phaseSel = document.createElement('select');
+      PHASES.forEach(p => {
+        const o = document.createElement('option');
+        o.value = o.textContent = p;
+        phaseSel.appendChild(o);
+      });
+      phaseSel.value = s.phase;
+      phaseSel.addEventListener('change', () => { s.phase = phaseSel.value; saveSurveyCfg(); });
+      const del = document.createElement('button');
+      del.className = 'cfg-del';
+      del.textContent = '삭제';
+      del.addEventListener('click', () => {
+        if (confirm('"' + (s.name || '이 설문') + '" 을(를) 삭제할까요?')) {
+          SURVEYS.splice(SURVEYS.indexOf(s), 1);
+          saveSurveyCfg();
+          renderCfg();
+          updateSurveyBtn();
+        }
+      });
+      row.appendChild(phaseSel);
+      row.appendChild(del);
+
+      card.appendChild(nameIn);
+      card.appendChild(urlIn);
+      card.appendChild(row);
+      wrap.appendChild(card);
+    });
+
+    const add = document.createElement('button');
+    add.textContent = '＋ 설문 추가';
+    add.addEventListener('click', () => {
+      SURVEYS.push({ id: 's' + Date.now(), phase: '실험 전', name: '', url: '' });
+      saveSurveyCfg();
+      renderCfg();
+      updateSurveyBtn();
+    });
+    wrap.appendChild(add);
+
+    const reset = document.createElement('button');
+    reset.className = 'ghost';
+    reset.textContent = '기본 설문 6개로 되돌리기';
+    reset.addEventListener('click', () => {
+      if (confirm('설문 목록을 기본값으로 되돌릴까요?\n(수정한 이름과 URL이 모두 사라져요)')) {
+        SURVEYS = JSON.parse(JSON.stringify(DEFAULT_SURVEYS));
+        saveSurveyCfg();
+        renderCfg();
+        updateSurveyBtn();
+      }
+    });
+    wrap.appendChild(reset);
+  }
+  $('surveyCfgBtn').addEventListener('click', () => {
+    renderCfg();
+    $('cfgView').classList.add('show');
+  });
+  $('cfgBack').addEventListener('click', () => {
+    $('cfgView').classList.remove('show');
+    updateSurveyBtn();
+  });
 
   // ---- 책 화면 버튼 ----
   $('rZoomIn').addEventListener('click', () => setZoom(zoom * 1.2));
