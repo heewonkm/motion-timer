@@ -617,6 +617,8 @@
   let flashTimer = null;
   let wakeLock = null;
   let reading = false;      // 책 읽기 모드 여부
+  // 자동 업데이트가 실험을 방해하지 않도록 진행 상태를 밖에 알림
+  window.__timerActive = () => !!tickTimer || pausedAt > 0 || reading;
 
   function show(name) {
     Object.values(views).forEach(v => v.classList.remove('active'));
@@ -1478,6 +1480,13 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+  // 새 버전이 활성화되면 자동 새로고침 (실험 진행 중에는 하지 않음)
+  let swRefreshed = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swRefreshed) return;
+    swRefreshed = true;
+    if (!(window.__timerActive && window.__timerActive())) location.reload();
   });
 }
 </script>
