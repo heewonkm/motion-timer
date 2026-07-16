@@ -1,4 +1,4 @@
-const CACHE = 'motion-timer-v4';
+const CACHE = 'motion-timer-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -27,6 +27,8 @@ self.addEventListener('activate', (e) => {
 // 나머지(라이브러리, 아이콘)는 캐시 우선 → 빠르고 오프라인 안전.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // 외부 요청(구글 스크립트, 설문 등)은 절대 캐시하지 않고 항상 네트워크로
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   const isNavigation = e.request.mode === 'navigate';
 
   if (isNavigation) {
