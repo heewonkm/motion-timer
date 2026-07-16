@@ -1010,12 +1010,17 @@
   }
   try { fillScenarios(JSON.parse(localStorage.getItem('scenarioList') || 'null')); } catch (e) {}
 
-  async function loadSubjects() {
+  async function loadSubjects(feedback) {
     let cached = null;
     try { cached = JSON.parse(localStorage.getItem(SUBJECTS_KEY) || 'null'); } catch (e) {}
     if (cached) fillSubjects(cached);
     const url = ($('sheetUrl').value || '').trim();
-    if (!url) { if (!cached) fillSubjects(null); return; }
+    if (!url) {
+      if (!cached) fillSubjects(null);
+      if (feedback) showToast('시트 URL을 먼저 입력해주세요');
+      return;
+    }
+    if (feedback) showToast('목록 불러오는 중…');
     try {
       const r = await fetch(url);
       const data = await r.json();
@@ -1030,12 +1035,17 @@
         localStorage.setItem('scenarioList', JSON.stringify(scenarios));
         fillScenarios(scenarios);
       }
+      if (feedback) {
+        showToast('✅ 피험자 ' + (Array.isArray(subjects) ? subjects.length : 0) + '명 · 시나리오 ' +
+          (Array.isArray(scenarios) ? scenarios.length + '개' : '(구버전 스크립트)') + ' 불러왔어요');
+      }
     } catch (e) {
       if (!cached) fillSubjects(null);
+      if (feedback) showToast('❌ 불러오기 실패 — 인터넷 연결과 URL을 확인해주세요');
     }
   }
   $('subject').addEventListener('change', () => localStorage.setItem('subject', $('subject').value));
-  $('subjectRefresh').addEventListener('click', loadSubjects);
+  $('subjectRefresh').addEventListener('click', () => loadSubjects(true));
   $('sheetUrl').addEventListener('change', loadSubjects);
   loadSubjects();
 
