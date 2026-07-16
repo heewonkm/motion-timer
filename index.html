@@ -36,7 +36,16 @@
     -webkit-user-select: none;
   }
 
-  .view { width: 100%; max-width: 420px; display: none; flex-direction: column; gap: 16px; }
+  .view {
+    width: 100%;
+    max-width: 420px;
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .view.active { display: flex; }
 
   h1 { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: -0.3px; }
@@ -425,6 +434,19 @@
   #doneView .sub { font-size: 15px; color: var(--dim); }
 
   .hint { font-size: 12px; color: var(--dim); text-align: center; line-height: 1.6; }
+
+  /* ---- 만든이 ---- */
+  #credit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 4px;
+    opacity: 0.85;
+  }
+  #credit img { width: 64px; height: auto; }
+  #credit .credit-text { font-size: 11px; color: var(--dim); line-height: 1.7; text-align: left; }
+  #credit .credit-text b { color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -494,6 +516,10 @@
   <button class="primary" id="startBtn">시작</button>
   <button class="ghost" id="previewBtn">✨ 반짝임 미리보기</button>
   <p class="hint">측정 중에는 화면이 꺼지지 않도록 유지돼요.</p>
+  <div id="credit">
+    <img src="fox.png" alt="여우">
+    <div class="credit-text">made by<br><b>heewonkm@kookmin.ac.kr</b></div>
+  </div>
 </div>
 
 <!-- 실행 화면 (책 없이 타이머만) -->
