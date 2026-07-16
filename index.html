@@ -994,6 +994,22 @@
     if (list.indexOf(saved) >= 0) sel.value = saved;
     localStorage.setItem('subject', sel.value);
   }
+  // -- 시나리오 목록: 시트 A열에서 자동으로 불러옴 (없으면 기본 목록 유지) --
+  function fillScenarios(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    const sel = $('scenario');
+    const saved = localStorage.getItem('scenario') || sel.value;
+    sel.innerHTML = '';
+    for (const name of list) {
+      const o = document.createElement('option');
+      o.value = o.textContent = name;
+      sel.appendChild(o);
+    }
+    if (list.indexOf(saved) >= 0) sel.value = saved;
+    localStorage.setItem('scenario', sel.value);
+  }
+  try { fillScenarios(JSON.parse(localStorage.getItem('scenarioList') || 'null')); } catch (e) {}
+
   async function loadSubjects() {
     let cached = null;
     try { cached = JSON.parse(localStorage.getItem(SUBJECTS_KEY) || 'null'); } catch (e) {}
@@ -1002,10 +1018,17 @@
     if (!url) { if (!cached) fillSubjects(null); return; }
     try {
       const r = await fetch(url);
-      const list = await r.json();
-      if (Array.isArray(list) && list.length) {
-        localStorage.setItem(SUBJECTS_KEY, JSON.stringify(list));
-        fillSubjects(list);
+      const data = await r.json();
+      // 구버전 스크립트는 배열(탭 목록)만, 신버전은 {subjects, scenarios}를 보냄
+      const subjects = Array.isArray(data) ? data : (data && data.subjects);
+      const scenarios = Array.isArray(data) ? null : (data && data.scenarios);
+      if (Array.isArray(subjects) && subjects.length) {
+        localStorage.setItem(SUBJECTS_KEY, JSON.stringify(subjects));
+        fillSubjects(subjects);
+      }
+      if (Array.isArray(scenarios) && scenarios.length) {
+        localStorage.setItem('scenarioList', JSON.stringify(scenarios));
+        fillScenarios(scenarios);
       }
     } catch (e) {
       if (!cached) fillSubjects(null);
