@@ -1239,7 +1239,10 @@
     curSurvey = s;
     $('svTitle').textContent = s.name;
     $('svDone').textContent = getSurveyDone()[s.id] ? '완료 취소' : '완료로 표시 ✓';
-    const subj = $('subject').value;
+    // 탭 이름에서 "SUB1" 같은 접두어를 떼고 이름만 추출 (예: "SUB1 김철수" → "김철수")
+    const raw = $('subject').value;
+    const korean = raw.match(/[가-힣]{2,}/);
+    const subj = korean ? korean[0] : (raw.replace(/^SUB\d+[\s_.-]*/i, '').trim() || raw);
     // 피험자 이름을 URL에 첨부 (SurveyMonkey 사용자 지정 변수용) + 클립보드에 복사
     const sep = s.url.indexOf('?') >= 0 ? '&' : '?';
     $('svFrame').src = subj ? s.url + sep + 'subject=' + encodeURIComponent(subj) : s.url;
