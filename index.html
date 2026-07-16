@@ -1240,17 +1240,19 @@
     $('svTitle').textContent = s.name;
     $('svDone').textContent = getSurveyDone()[s.id] ? '완료 취소' : '완료로 표시 ✓';
     const subj = $('subject').value;
+    // 복사용 텍스트: 피험자 + 시나리오 (예: "SUB1 김희원 S&G 오전")
+    const copyText = (subj + ' ' + $('scenario').value).trim();
     // 피험자 이름을 URL에 첨부 (SurveyMonkey 사용자 지정 변수용) + 클립보드에 복사
     const sep = s.url.indexOf('?') >= 0 ? '&' : '?';
     $('svFrame').src = subj ? s.url + sep + 'subject=' + encodeURIComponent(subj) : s.url;
     $('surveyView').classList.add('frame-mode');
-    if (subj) {
+    if (copyText) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(subj)
-          .then(() => showToast('📋 "' + subj + '" 복사됨 — 이름 칸을 길게 눌러 붙여넣기'))
-          .catch(() => showToast('피험자: ' + subj));
+        navigator.clipboard.writeText(copyText)
+          .then(() => showToast('📋 "' + copyText + '" 복사됨 — 이름 칸을 길게 눌러 붙여넣기'))
+          .catch(() => showToast(copyText));
       } else {
-        showToast('피험자: ' + subj);
+        showToast(copyText);
       }
     }
   }
