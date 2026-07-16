@@ -326,6 +326,28 @@
   .cfg-item select { flex: 1; font-size: 14px; padding: 10px; background: #262a3a; width: auto; }
   .cfg-del { color: #ff9d9d; background: #262a3a; font-size: 13px; padding: 10px 14px; }
 
+  /* ---- 토스트 안내 ---- */
+  #toast {
+    position: fixed;
+    bottom: max(28px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 70;
+    background: rgba(20, 22, 32, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 12px 18px;
+    border-radius: 999px;
+    max-width: 90vw;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #toast.show { opacity: 1; }
+
   /* ---- 멀미 점수 패널 ---- */
   #scorePanel {
     position: fixed;
@@ -539,6 +561,9 @@
 
 <!-- 멀미 점수 입력 패널 -->
 <div id="scorePanel"></div>
+
+<!-- 토스트 안내 -->
+<div id="toast"></div>
 
 <!-- 반짝임 오버레이 -->
 <div id="flash">
@@ -1200,13 +1225,34 @@
     $('surveyView').classList.remove('frame-mode');
     $('surveyView').classList.add('show');
   }
+  let toastTimer = null;
+  function showToast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
   function openSurvey(s) {
     if (!s.url) { alert('이 설문의 URL이 비어 있어요.\n⚙️ 설문 링크 설정에서 입력해주세요.'); return; }
     curSurvey = s;
     $('svTitle').textContent = s.name;
     $('svDone').textContent = getSurveyDone()[s.id] ? '완료 취소' : '완료로 표시 ✓';
-    $('svFrame').src = s.url;
+    const subj = $('subject').value;
+    // 피험자 이름을 URL에 첨부 (SurveyMonkey 사용자 지정 변수용) + 클립보드에 복사
+    const sep = s.url.indexOf('?') >= 0 ? '&' : '?';
+    $('svFrame').src = subj ? s.url + sep + 'subject=' + encodeURIComponent(subj) : s.url;
     $('surveyView').classList.add('frame-mode');
+    if (subj) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(subj)
+          .then(() => showToast('📋 "' + subj + '" 복사됨 — 이름 칸을 길게 눌러 붙여넣기'))
+          .catch(() => showToast('피험자: ' + subj));
+      } else {
+        showToast('피험자: ' + subj);
+      }
+    }
   }
   function closeSurveyFrame() {
     $('svFrame').src = 'about:blank';
