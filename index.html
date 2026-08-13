@@ -1209,22 +1209,30 @@
 
   // ================= 설문 =================
   const PHASES = ['실험 전', '실험 중', '실험 후'];
+  // 기본 설문 URL을 바꾸면 SURVEYS_VERSION을 올린다 → 기존 기기도 다음 실행 때 새 주소로 자동 갱신
+  const SURVEYS_VERSION = 2;
   const DEFAULT_SURVEYS = [
-    { id: 'cond',      phase: '실험 전', name: '컨디션 평가',      url: 'https://ko.surveymonkey.com/r/7377DYS' },
-    { id: 'mssq',      phase: '실험 전', name: 'MSSQ 멀미 민감도', url: 'https://ko.surveymonkey.com/r/X7L39Z6' },
-    { id: 'msaq_pre',  phase: '실험 전', name: 'MSAQ (주행 전)',   url: 'https://ko.surveymonkey.com/r/7372FSP' },
-    { id: 'msaq_mid',  phase: '실험 중', name: 'MSAQ (주행 중)',   url: 'https://ko.surveymonkey.com/r/X7VHRTN' },
-    { id: 'msaq_post', phase: '실험 후', name: 'MSAQ (주행 후)',   url: 'https://ko.surveymonkey.com/r/X7KCVTK' },
-    { id: 'fss',       phase: '실험 후', name: 'FSS NDRT 몰입도',  url: 'https://ko.surveymonkey.com/r/X7V9XNL' }
+    { id: 'cond',      phase: '실험 전', name: '컨디션 평가',      url: 'https://ko.surveymonkey.com/r/FSXJNQY' },
+    { id: 'mssq',      phase: '실험 전', name: 'MSSQ 멀미 민감도', url: 'https://ko.surveymonkey.com/r/FSMM2Y2' },
+    { id: 'msaq_pre',  phase: '실험 전', name: 'MSAQ (주행 전)',   url: 'https://ko.surveymonkey.com/r/Y9Z28SF' },
+    { id: 'msaq_mid',  phase: '실험 중', name: 'MSAQ (주행 중)',   url: 'https://ko.surveymonkey.com/r/FSRK3XK' },
+    { id: 'msaq_post', phase: '실험 후', name: 'MSAQ (주행 후)',   url: 'https://ko.surveymonkey.com/r/Y9GBHLF' },
+    { id: 'fss',       phase: '실험 후', name: 'FSS NDRT 몰입도',  url: 'https://ko.surveymonkey.com/r/FSJ9QVM' }
   ];
   let SURVEYS = (function () {
     try {
-      const s = JSON.parse(localStorage.getItem('surveyConfig') || 'null');
-      if (Array.isArray(s) && s.length) return s;
+      // 저장된 설문 버전이 최신일 때만 저장본 사용, 아니면 새 기본값으로 갱신
+      if (localStorage.getItem('surveyConfigVersion') === String(SURVEYS_VERSION)) {
+        const s = JSON.parse(localStorage.getItem('surveyConfig') || 'null');
+        if (Array.isArray(s) && s.length) return s;
+      }
     } catch (e) {}
     return JSON.parse(JSON.stringify(DEFAULT_SURVEYS));
   })();
-  function saveSurveyCfg() { localStorage.setItem('surveyConfig', JSON.stringify(SURVEYS)); }
+  function saveSurveyCfg() {
+    localStorage.setItem('surveyConfig', JSON.stringify(SURVEYS));
+    localStorage.setItem('surveyConfigVersion', String(SURVEYS_VERSION));
+  }
   function orderedSurveys() { return PHASES.flatMap(p => SURVEYS.filter(s => s.phase === p)); }
   let curSurvey = null;
 
