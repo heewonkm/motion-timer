@@ -1,11 +1,10 @@
-const CACHE = 'motion-timer-v8';
+const CACHE = 'motion-timer-v9';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-512.png',
-  './fox.png',
   './pdf.min.js',
   './pdf.worker.min.js'
 ];

@@ -55,8 +55,7 @@ motion-timer/
 ├── pdf.min.js            pdf.js 라이브러리
 ├── pdf.worker.min.js     pdf.js 워커
 ├── icon-180.png          앱 아이콘 (홈 화면)
-├── icon-512.png          앱 아이콘
-└── fox.png               크레딧 캐릭터
+└── icon-512.png          앱 아이콘
 ```
 
 ---
