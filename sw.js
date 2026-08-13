@@ -1,4 +1,4 @@
-const CACHE = 'motion-timer-v9';
+const CACHE = 'motion-timer-v10';
 const ASSETS = [
   './',
   './index.html',
