@@ -1007,7 +1007,9 @@
   let queue = [];
   try { queue = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { queue = []; }
 
-  $('sheetUrl').value = localStorage.getItem('sheetUrl') || '';
+  const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbxfDSgnKXmHPXjCKVsx2QBqzoensGA71b4JYfTvJjr1Ya82GKeM-LAovREe3VfZ8D8v/exec';
+  var savedSheetUrl = localStorage.getItem('sheetUrl');
+  $('sheetUrl').value = (savedSheetUrl === null ? DEFAULT_SHEET_URL : savedSheetUrl);
   $('sheetUrl').addEventListener('input', () => localStorage.setItem('sheetUrl', $('sheetUrl').value.trim()));
   if (localStorage.getItem('scenario')) $('scenario').value = localStorage.getItem('scenario');
   $('scenario').addEventListener('change', () => localStorage.setItem('scenario', $('scenario').value));
