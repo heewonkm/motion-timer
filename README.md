@@ -55,7 +55,9 @@ motion-timer/
 ├── pdf.min.js            pdf.js 라이브러리
 ├── pdf.worker.min.js     pdf.js 워커
 ├── icon-180.png          앱 아이콘 (홈 화면)
-└── icon-512.png          앱 아이콘
+├── icon-512.png          앱 아이콘
+├── logo-mobis.png        상단 로고 (현대 모비스)
+└── logo-fmcl.png         상단 로고 (Future Mobility Control Lab)
 ```
 
 ---
