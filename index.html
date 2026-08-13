@@ -51,18 +51,26 @@
   h1 { font-size: 20px; font-weight: 700; text-align: center; letter-spacing: -0.3px; }
   h1 span { color: var(--accent); }
 
-  /* ---- 상단 로고 바 ---- */
+  /* ---- 상단 로고 바 (모비스 · 제목 · FMCL) ---- */
   #logoBar {
     background: #fff;
     border-radius: 14px;
-    padding: 12px 18px;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    gap: 10px;
   }
-  #logoBar img { height: 30px; width: auto; display: block; }
-  #logoBar img[alt="Future Mobility Control Lab"] { height: 40px; }
+  #logoBar img { height: 26px; width: auto; display: block; flex-shrink: 0; }
+  #logoBar img[alt="Future Mobility Control Lab"] { height: 36px; }
+  #logoBar h1 {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1a1c26;
+    white-space: nowrap;
+    letter-spacing: -0.3px;
+  }
+  #logoBar h1 span { color: #3b62e0; }
 
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 13px; color: var(--dim); }
@@ -460,9 +468,9 @@
 <div class="view active" id="setupView">
   <div id="logoBar">
     <img src="logo-mobis.png" alt="현대 모비스">
+    <h1>멀미 <span>타이머</span></h1>
     <img src="logo-fmcl.png" alt="Future Mobility Control Lab">
   </div>
-  <h1>멀미 <span>타이머</span></h1>
   <div class="field">
     <label>전체 측정 시간</label>
     <div class="row">
